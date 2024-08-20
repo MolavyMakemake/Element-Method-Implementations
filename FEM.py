@@ -21,7 +21,7 @@ class Model:
                 n += 1
 
         for i, j in self.identify:
-            elements[i] = elements[j]
+            elements[j] = elements[i]
 
         M = np.zeros([n, n])
         L = np.zeros([n, n])
@@ -63,9 +63,8 @@ class Model:
     def solve_poisson(self, f):
         M, L, mask = self.basis()
         u = np.zeros(len(self.vertices), dtype=complex)
-        b = np.zeros(len(self.vertices), dtype=complex)
+        b = M @ f(self.vertices[mask, 0] + 1j * self.vertices[mask, 1])
 
-        b[mask] = M @ f(self.vertices)
         u[mask] = np.linalg.solve(L, b)
 
         return u
@@ -77,4 +76,4 @@ class Model:
         eigenvalues, eigenvectors = np.linalg.eig(np.linalg.inv(L) @ M)
 
         u[mask] = eigenvectors[0]
-        return eigenvalues[0], u
+        return eigenvalues[0], u / np.sqrt(np.real(np.dot(M @ eigenvectors[0], np.conj(eigenvectors[0]))))

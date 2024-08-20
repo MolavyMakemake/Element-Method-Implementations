@@ -8,7 +8,6 @@ N = 21
 fem = FEM.Model()
 
 fem.vertices = np.zeros([N*N, 2])
-
 X, Y = np.meshgrid(np.linspace(-1, 1, N), np.linspace(-1, 1, N))
 
 fem.vertices[:, 0] = X.flatten()
@@ -33,20 +32,12 @@ for y_i in range(N-1):
         fem.triangles.append((i, i + 1, i+N + 1))
 
 
-u = np.zeros(N * N, dtype=complex)
-f = np.zeros(N * N, dtype=complex)
-
 s = 2.5
 f = lambda z: z
 #r2 = s * (np.square(vertices[elements_mask, 0]) + np.square(vertices[elements_mask, 1]))
 #f[elements_mask] = 4 * s * np.exp(-r2) * (1 - r2)
 
-eigenvalues, eigenvectors = np.linalg.eig(np.linalg.inv(L) @ M)
-
-l, v = eigenvalues[0], eigenvectors[0]
-norm = np.sqrt(np.real(np.dot(M @ v, np.conj(v))))
-
-u[elements_mask] = v / norm
+l, u = fem.solve_spectrum()
 
 #ax.plot_trisurf(vertices[:, 0], vertices[:, 1], triangles, abs_z, alpha=0.75, cmap=cm.Greys)
 #ax.tricontourf(vertices[:, 0], vertices[:, 1], arg_z, triangles=triangles, zdir='z', offset=0, cmap='coolwarm')
@@ -55,8 +46,8 @@ u[elements_mask] = v / norm
 #       xlabel='X', ylabel='Y', zlabel='Z')
 
 
-plot.complex(vertices, triangles, u)
+plot.complex(fem.vertices, fem.triangles, u)
 
-plt.matshow(M)
-plt.matshow(L)
+#plt.matshow(M)
+#plt.matshow(L)
 plt.show()

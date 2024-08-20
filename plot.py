@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import cm
 from matplotlib import colors
 from matplotlib import tri
 
@@ -21,7 +20,11 @@ def complex(vertices, triangles, u):
     ax = plt.figure().add_subplot()
 
     tr = tri.Triangulation(vertices[:, 0], vertices[:, 1], triangles)
-    ax.tricontourf(tr, np.angle(u), cmap='hsv')
+    ax.tricontourf(tr, np.angle(u), levels=100, cmap='hsv')
     ax.tricontourf(tr, np.abs(u), cmap=alpha_cm)
     ax.set(xlim=(-1, 1), ylim=(-1, 1), xlabel='X', ylabel='Y')
     ax.set_aspect("equal")
+
+def surface(vertices, triangles, u):
+    ax = plt.figure().add_subplot(projection='3d')
+    ax.plot_trisurf(vertices[:, 0], vertices[:, 1], triangles, u)
