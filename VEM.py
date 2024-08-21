@@ -7,10 +7,6 @@ class Model:
         self.trace = trace
         self._identify = []
 
-    def identify(self, i, j):
-        self.trace.append(j)
-        self._identify.append([i, j])
-
     def basis(self):
         n = 0
         elements = []
@@ -31,9 +27,9 @@ class Model:
         L = np.zeros([n, n])
 
         for v_i, v_j, v_k in self.triangles:
-            v1 = self.vertices[v_k] - self.vertices[v_j]
-            v2 = self.vertices[v_i] - self.vertices[v_k]
-            v3 = self.vertices[v_j] - self.vertices[v_i]
+            v1 = self.vertices[v_j] - self.vertices[v_i]
+            v2 = self.vertices[v_k] - self.vertices[v_i]
+            v3 = self.vertices[v_j] - self.vertices[v_k]
             Jac_A = np.abs(v1[0] * v2[1] - v2[0] * v1[1])
 
             m = Jac_A / 24
@@ -43,24 +39,24 @@ class Model:
 
             if i >= 0:
                 M[i, i] += m * 2
-                L[i, i] += l * np.dot(v1, v1)
+                L[i, i] += l * np.dot(v3, v3)
                 if j >= 0:
                     M[(i, j), (j, i)] += m
-                    L[(i, j), (j, i)] += l * np.dot(v1, v2)
+                    L[(i, j), (j, i)] += l * np.dot(v3, v2)
                 if k >= 0:
                     M[(i, k), (k, i)] += m
-                    L[(i, k), (k, i)] += l * np.dot(v1, v3)
+                    L[(i, k), (k, i)] -= l * np.dot(v3, v1)
 
             if j >= 0:
                 M[j, j] += m * 2
                 L[j, j] += l * np.dot(v2, v2)
                 if k >= 0:
                     M[(j, k), (k, j)] += m
-                    L[(j, k), (k, j)] += l * np.dot(v2, v3)
+                    L[(j, k), (k, j)] -= l * np.dot(v1, v2)
 
             if k >= 0:
                 M[k, k] += m * 2
-                L[k, k] += l * np.dot(v3, v3)
+                L[k, k] += l * np.dot(v1, v1)
 
         return M, L, elements_mask
 
