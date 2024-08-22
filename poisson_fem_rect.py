@@ -73,8 +73,10 @@ for v_i, v_j, v_k in triangles:
 u = np.zeros(N * N)
 f = np.zeros(N * N)
 
-f[elements_mask] = 2 * np.pi ** 2 * np.sin(np.pi * vertices[elements_mask, 0]) \
-                   * np.sin(np.pi * vertices[elements_mask, 1])
+#f[elements_mask] = 2 * np.pi ** 2 * np.sin(np.pi * vertices[elements_mask, 0]) \
+#                   * np.sin(np.pi * vertices[elements_mask, 1])
+f[elements_mask] = vertices[elements_mask, 0] ** 2 \
+                   - vertices[elements_mask, 1] ** 2
 u[elements_mask] = np.linalg.solve(L, M @ f[elements_mask])
 
 ax = plt.figure().add_subplot(projection='3d')

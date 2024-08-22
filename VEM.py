@@ -1,18 +1,18 @@
 import numpy as np
 
 class Model:
-    def __init__(self, vertices=[], triangles=[], trace=[]):
+    def __init__(self, vertices=[], polygons=[], trace=[]):
         self.vertices = vertices
-        self.triangles = triangles
+        self.polygons = polygons
         self.trace = trace
         self._identify = []
 
-    def basis(self):
+    def basis(self, f):
         n = 0
         elements = []
         elements_mask = []
 
-        for i in range(len(self.vertices)):
+        for i in range(np.size(self.vertices, axis=1)):
             if i in self.trace:
                 elements.append(-1)
             else:
@@ -23,48 +23,62 @@ class Model:
         for i, j in self._identify:
             elements[j] = elements[i]
 
-        M = np.zeros([n, n])
         L = np.zeros([n, n])
+        b = np.zeros(n)
 
-        for v_i, v_j, v_k in self.triangles:
-            v1 = self.vertices[v_j] - self.vertices[v_i]
-            v2 = self.vertices[v_k] - self.vertices[v_i]
-            v3 = self.vertices[v_j] - self.vertices[v_k]
-            Jac_A = np.abs(v1[0] * v2[1] - v2[0] * v1[1])
+        rot = np.array([[0, 1], [-1, 0]])
 
-            m = Jac_A / 24
-            l = .5 / Jac_A
+        for p_i in self.polygons:
+            p1 = self.vertices[:, p_i]
+            p0 = np.roll(p1, 1, axis=1)
+            p2 = np.roll(p1, -1, axis=1)
 
-            i, j, k = elements[v_i], elements[v_j], elements[v_k]
+            N = np.size(p1, axis=1)
 
-            if i >= 0:
-                M[i, i] += m * 2
-                L[i, i] += l * np.dot(v3, v3)
-                if j >= 0:
-                    M[(i, j), (j, i)] += m
-                    L[(i, j), (j, i)] += l * np.dot(v3, v2)
-                if k >= 0:
-                    M[(i, k), (k, i)] += m
-                    L[(i, k), (k, i)] -= l * np.dot(v3, v1)
+            d0 = np.linalg.norm(p1 - p0, axis=0)
+            d1 = np.roll(d0, -1)
 
-            if j >= 0:
-                M[j, j] += m * 2
-                L[j, j] += l * np.dot(v2, v2)
-                if k >= 0:
-                    M[(j, k), (k, j)] += m
-                    L[(j, k), (k, j)] -= l * np.dot(v1, v2)
+            area = 0.5 * np.abs(np.dot(p1[0, :], p0[1, :]) - np.dot(p0[0, :], p1[1, :]))  # shoelace
+            circumference = np.sum(d0)
 
-            if k >= 0:
-                M[k, k] += m * 2
-                L[k, k] += l * np.dot(v1, v1)
+            print("area:", area, ", circumference:", circumference)
+            print("points:\n", p1, "\n")
 
-        return M, L, elements_mask
+            I_f = area * np.average(f(p1[0, :] + 1j * p1[1, :]))
+
+            proj_D = rot @ (p2 - p0) / (2 * area)
+            proj_a = (d0 + d1 - ((p1 + p0) @ d0) @ proj_D) / (2 * circumference)
+
+            for i in range(N):
+                e_i = elements[p_i[i]]
+                if e_i < 0:
+                    continue
+
+                d_ik = i == np.arange(0, N)
+                for j in range(N):
+                    e_j = elements[p_i[j]]
+                    if e_j < 0:
+                        continue
+
+                    # compute local LHS
+                    d_jk = j == np.arange(0, N)
+                    a = np.dot(proj_D[:, i], proj_D[:, j]) * area
+                    s = np.sum((d_ik - proj_a[i] - proj_D[:, i] @ p1) * (d_jk - proj_a[j] - proj_D[:, j] @ p1))
+
+                    L[e_i, e_j] += a + s
+
+                # compute local RHS
+                b[e_i] += I_f / N
+
+        return L, b, elements_mask
 
     def solve_poisson(self, f):
-        M, L, mask = self.basis()
-        u = np.zeros(len(self.vertices), dtype=complex)
-        b = M @ f(self.vertices[mask, 0] + 1j * self.vertices[mask, 1])
+        L, b, mask = self.basis(f)
 
+        print(L)
+        print(b)
+
+        u = np.zeros(np.size(self.vertices, axis=1), dtype=complex)
         u[mask] = np.linalg.solve(L, b)
 
         return u
