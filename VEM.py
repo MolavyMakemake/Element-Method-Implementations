@@ -1,37 +1,58 @@
 import numpy as np
 
 class Model:
-    def __init__(self, domain="rectangle", bounds=np.array([[-1, 1], [-1, 1]]), resolution=[21, 21], isTraceFixed=True):
+    def __init__(self, domain="rectangle", bounds=np.array([[-1, 1], [-1, 1]]),
+                 resolution=[21, 21], isTraceFixed=True, computeSpectrumOnBake=False):
         self.bounds = bounds
         self.resolution = resolution
         self.domain = domain
         self.isTraceFixed = isTraceFixed
 
-        self.vertices = []
-        self.polygons = []
+        self._vertices_normalized = []
         self._exclude = []
         self._identify = [[], []]
+        self._area = []
+        self._elements = []
+
+        self.vertices = []
+        self.polygons = []
+        self.triangles = []
+        self.L = np.array([[]])
+        self.M = np.array([[]])
+        self._mask = []
+
+        self.eigenvectors = []
+        self.eigenvalues = []
+        self.computeSpectrumOnBake = computeSpectrumOnBake
 
         self.bake()
 
     def bake(self):
+        self._bake_domain()
+        self._bake_data()
+        self._bake_matrices()
+
+        if self.computeSpectrumOnBake:
+            self.bake_spectrum()
+
+    def _bake_domain(self):
         W = self.resolution[0]
         H = self.resolution[1]
 
-        self.vertices = np.zeros([2, W * H])
+        self._vertices_normalized = np.zeros([2, W * H])
         X, Y = np.meshgrid(np.linspace(-1, 1, W), np.linspace(-1, 1, H))
 
-        self.vertices[0, :] = X.flatten()
-        self.vertices[1, :] = Y.flatten()
+        self._vertices_normalized[0, :] = X.flatten()
+        self._vertices_normalized[1, :] = Y.flatten()
 
         self.polygons = []
         for y_i in range(H - 1):
             for x_i in range(W - 1):
                 i = W * y_i + x_i
-                self.polygons.append((i, i + 1, i + W + 1, i + W))
+                self.polygons.append([i, i + 1, i + W + 1, i + W])
 
         if self.domain == "elliptic disk":
-            for v in self.vertices.T:
+            for v in self._vertices_normalized.T:
                 if abs(v[0]) > abs(v[1]):
                     v /= np.linalg.norm(v / v[0])
                 elif v[1] != 0:
@@ -45,12 +66,6 @@ class Model:
                 self.identify(W * (i + 1) - 1, W * i)
 
             self.identify(W * H - 1, 0)
-
-        self.bake_trace()
-
-    def bake_trace(self):
-        W = self.resolution[0]
-        H = self.resolution[1]
 
         self._exclude = self._identify[0].copy()
 
@@ -70,24 +85,38 @@ class Model:
         self._identify[0].append(i)
         self._identify[1].append(j)
 
-    def basis(self, vertices, f):
+    def _bake_data(self):
+        bounds_offset = self.bounds[:, 0] - np.array([-1, -1])
+        bounds_mat = 0.5 * np.array([
+            [self.bounds[0, 1] - self.bounds[0, 0], 0],
+            [0, self.bounds[1, 1] - self.bounds[1, 0]]
+        ])
+        self.vertices = np.reshape(bounds_offset, [2, 1]) + bounds_mat @ self._vertices_normalized
+
+        self.triangles = []
+        for p_i in self.polygons:
+            for i in range(2, len(p_i)):
+                self.triangles.append([p_i[0], p_i[i - 1], p_i[i]])
+
+    def _bake_matrices(self):
         n = 0
         elements = []
-        elements_mask = []
+        self._mask = []
+        self._area = []
 
-        for i in range(np.size(vertices, axis=1)):
-            if i in self.trace:
+        for i in range(np.size(self.vertices, axis=1)):
+            if i in self._exclude:
                 elements.append(-1)
             else:
                 elements.append(n)
-                elements_mask.append(i)
+                self._mask.append(i)
                 n += 1
 
-        elements = np.array(elements)
-        elements[self._identify[0]] = elements[self._identify[1]]
+        self._elements = np.array(elements)
+        self._elements[self._identify[0]] = self._elements[self._identify[1]]
 
-        L = np.zeros([n, n], dtype=complex)
-        b = np.zeros(n, dtype=complex)
+        self.L = np.zeros([n, n])
+        self.M = np.zeros([n, n])
 
         rot = np.array([[0, 1], [-1, 0]])
 
@@ -102,24 +131,20 @@ class Model:
             d1 = np.roll(d0, -1)
 
             area = 0.5 * np.abs(np.dot(p1[0, :], p0[1, :]) - np.dot(p0[0, :], p1[1, :]))  # shoelace
+            self._area.append(area)
             circumference = np.sum(d0)
-
-            print("area:", area, ", circumference:", circumference)
-            print("points:\n", p1, "\n")
-
-            I_f = area * np.average(f(p1[0, :] + 1j * p1[1, :]))
 
             proj_D = rot @ (p2 - p0) / (2 * area)
             proj_a = (d0 + d1 - ((p1 + p0) @ d0) @ proj_D) / (2 * circumference)
 
             for i in range(N):
-                e_i = elements[p_i[i]]
+                e_i = self._elements[p_i[i]]
                 if e_i < 0:
                     continue
 
                 d_ik = i == np.arange(0, N)
                 for j in range(N):
-                    e_j = elements[p_i[j]]
+                    e_j = self._elements[p_i[j]]
                     if e_j < 0:
                         continue
 
@@ -128,36 +153,36 @@ class Model:
                     a = np.dot(proj_D[:, i], proj_D[:, j]) * area
                     s = np.sum((d_ik - proj_a[i] - proj_D[:, i] @ p1) * (d_jk - proj_a[j] - proj_D[:, j] @ p1))
 
-                    L[e_i, e_j] += a + s
-
-                # compute local RHS
-                b[e_i] += I_f / N
-
-        return L, b, elements_mask
+                    self.L[e_i, e_j] += a + s
+                    self.M[e_i, e_j] += area / (N * N)
 
     def solve_poisson(self, f):
-        bounds_offset = self.bounds[:, 0] - np.array([-1, -1])
-        bounds_mat = 0.5 * np.array([
-            [self.bounds[0, 1] - self.bounds[0, 0], 0],
-            [0, self.bounds[1, 1] - self.bounds[1, 0]]
-        ])
-        vertices = np.reshape(bounds_offset, [2, 1]) + bounds_mat @ self.vertices
-
-        L, b, mask = self.basis(vertices, f)
-
-        print(L)
-        print(b)
-
         u = np.zeros(np.size(self.vertices, axis=1), dtype=complex)
-        u[mask] = np.linalg.solve(L, b)
+        #b = np.zeros(len(self._mask), dtype=complex)
+        #for i in range(len(self._mask)):
+        #    p_i = self.polygons[i]
+        #    p1 = self.vertices[:, p_i]
+        #    N = np.size(p1, axis=1)
+#
+        #    I_f = self._area[i] * np.average(f(p1[0, :] + 1j * p1[1, :]))
+        #    for j in range(N):
+        #        e_j = self._elements[p_i[j]]
+        #        if e_j < 0:
+        #            continue
+#
+        #        b[e_j] += I_f / N
 
-        return vertices[0, :], vertices[0, :], u
+        b = self.M @ f(self.vertices[0, self._mask] + 1j * self.vertices[1, self._mask])
+        u[self._mask] = np.linalg.solve(self.L, b)
 
-    def solve_spectrum(self):
-        L, M, mask = self.basis()
-        u = np.zeros(len(self.vertices), dtype=complex)
+        u[self._identify[0]] = u[self._identify[1]]
+        return u
 
-        eigenvalues, eigenvectors = np.linalg.eig(np.linalg.inv(L) @ M)
+    def bake_spectrum(self):
+        u = np.zeros((len(self._mask), np.size(self.vertices, axis=1)), dtype=complex)
 
-        u[mask] = eigenvectors[0]
-        return eigenvalues[0], u / np.sqrt(np.real(np.dot(M @ eigenvectors[0], np.conj(eigenvectors[0]))))
+        self.eigenvalues, eigenvectors = np.linalg.eig(np.linalg.inv(self.L) @ self.M)
+
+        u[:, self._mask] = eigenvectors
+        self.eigenvectors = u / np.reshape(np.sqrt(np.real(
+            np.sum((self.M @ eigenvectors) * np.conj(eigenvectors), axis=1))), [len(self.eigenvalues), 1])
