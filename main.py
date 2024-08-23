@@ -53,12 +53,12 @@ def main():
     window["inp_res1"].bind("<Return>", "")
     window["inp_f"].bind("<Return>", "")
 
-    rplot_fig = plt.figure(0)
-    cplot_fig = plt.figure(1)
+    rplot_fig = plt.figure(0, figsize=(6, 6))
+    cplot_fig = plt.figure(1, figsize=(6, 6))
     rplot_ax = rplot_fig.subplots(subplot_kw={"projection": "3d"})
     cplot_ax = cplot_fig.subplots()
-    matrix_fig = plt.figure(2)
-    matrix_ax = matrix_fig.subplots()
+    matrix_fig = plt.figure(2, figsize=(4, 6))
+    matrix_axs = matrix_fig.subplots(2, 1)
 
     solution_canvas = window["solution_plot"].TKCanvas
     matrix_canvas = window["matrix_plot"].TKCanvas
@@ -74,7 +74,8 @@ def main():
     u = np.real(u)
     plot.surface(rplot_ax, model.vertices, model.triangles, u)
     plot.add_wireframe(rplot_ax, model.vertices, model.polygons, u)
-    matrix_ax.matshow(model.L)
+    matrix_axs[0].matshow(model.L)
+    matrix_axs[1].matshow(model.M)
     solution_figCanvasAgg.draw()
     matrix_figCanvasAgg.draw()
 
@@ -168,12 +169,13 @@ def main():
                 plot.surface(rplot_ax, model.vertices, model.triangles, u)
                 plot.add_wireframe(rplot_ax, model.vertices, model.polygons, u)
 
-            matrix_ax.matshow(model.L)
+            matrix_axs[0].matshow(model.L)
+            matrix_axs[1].matshow(model.M)
             matrix_figCanvasAgg.draw()
 
             solution_figCanvasAgg.draw()
 
-        except Exception as e:
+        except ValueError as e:
             print(e)
             continue
 

@@ -19,6 +19,7 @@ class Model:
         self.triangles = []
         self.L = np.array([[]])
         self.M = np.array([[]])
+        self.I = np.array([[]])
         self._mask = []
 
         self.eigenvectors = []
@@ -116,12 +117,12 @@ class Model:
         self._elements[self._identify[0]] = self._elements[self._identify[1]]
 
         self.L = np.zeros([n, n])
-        self.M = np.zeros([n, n])
+        self.I = np.zeros([n, len(self.polygons)])
 
         rot = np.array([[0, 1], [-1, 0]])
 
-        for p_i in self.polygons:
-            p1 = self.vertices[:, p_i]
+        for p_i, p_I in enumerate(self.polygons):
+            p1 = self.vertices[:, p_I]
             p0 = np.roll(p1, 1, axis=1)
             p2 = np.roll(p1, -1, axis=1)
 
@@ -138,13 +139,13 @@ class Model:
             proj_a = (d0 + d1 - ((p1 + p0) @ d0) @ proj_D) / (2 * circumference)
 
             for i in range(N):
-                e_i = self._elements[p_i[i]]
+                e_i = self._elements[p_I[i]]
                 if e_i < 0:
                     continue
 
                 d_ik = i == np.arange(0, N)
                 for j in range(N):
-                    e_j = self._elements[p_i[j]]
+                    e_j = self._elements[p_I[j]]
                     if e_j < 0:
                         continue
 
@@ -154,25 +155,20 @@ class Model:
                     s = np.sum((d_ik - proj_a[i] - proj_D[:, i] @ p1) * (d_jk - proj_a[j] - proj_D[:, j] @ p1))
 
                     self.L[e_i, e_j] += a + s
-                    self.M[e_i, e_j] += area / (N * N)
+
+                self.I[e_i, p_i] += 1 / N
+
+        self.M = (self.I * self._area) @ np.transpose(self.I)
 
     def solve_poisson(self, f):
         u = np.zeros(np.size(self.vertices, axis=1), dtype=complex)
-        #b = np.zeros(len(self._mask), dtype=complex)
-        #for i in range(len(self._mask)):
-        #    p_i = self.polygons[i]
-        #    p1 = self.vertices[:, p_i]
-        #    N = np.size(p1, axis=1)
-#
-        #    I_f = self._area[i] * np.average(f(p1[0, :] + 1j * p1[1, :]))
-        #    for j in range(N):
-        #        e_j = self._elements[p_i[j]]
-        #        if e_j < 0:
-        #            continue
-#
-        #        b[e_j] += I_f / N
 
-        b = self.M @ f(self.vertices[0, self._mask] + 1j * self.vertices[1, self._mask])
+        I_f = np.zeros(len(self.polygons), dtype=complex)
+        for p_i, p_I in enumerate(self.polygons):
+            p = self.vertices[:, p_I]
+            I_f[p_i] = np.average(f(p[0, :] + 1j * p[1, :])) * self._area[p_i]
+
+        b = self.I @ I_f
         u[self._mask] = np.linalg.solve(self.L, b)
 
         u[self._identify[0]] = u[self._identify[1]]
