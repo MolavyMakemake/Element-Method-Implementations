@@ -52,6 +52,7 @@ class Model:
                 i = W * y_i + x_i
                 self.polygons.append([i, i + 1, i + W + 1, i + W])
 
+
         if self.domain == "elliptic disk":
             for v in self._vertices_normalized.T:
                 if abs(v[0]) > abs(v[1]):
@@ -163,13 +164,14 @@ class Model:
     def solve_poisson(self, f):
         u = np.zeros(np.size(self.vertices, axis=1), dtype=complex)
 
-        I_f = np.zeros(len(self.polygons), dtype=complex)
-        for p_i, p_I in enumerate(self.polygons):
-            p = self.vertices[:, p_I]
-            I_f[p_i] = np.average(f(p[0, :] + 1j * p[1, :])) * self._area[p_i]
+        #I_f = np.zeros(len(self.polygons), dtype=complex)
+        #for p_i, p_I in enumerate(self.polygons):
+        #    p = self.vertices[:, p_I]
+        #    I_f[p_i] = np.average(f(p[0, :] + 1j * p[1, :])) * self._area[p_i]
+        # b = self.I @ I_f
 
-        b = self.I @ I_f
-        u[self._mask] = np.linalg.solve(self.L, b)
+        p = self.vertices[:, self._mask]
+        u[self._mask] = np.linalg.solve(self.L, self.M @ f(p[0, :] + 1j * p[1, :]))
 
         u[self._identify[0]] = u[self._identify[1]]
         return u

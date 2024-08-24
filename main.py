@@ -10,11 +10,11 @@ import VEM
 import plot
 
 matplotlib.use('TkAgg')
-
+from orbifolds import orbit_sgn
 
 menu_def = [
     ["&solve", ["&poisson", "&spectrum"]],
-    ["&domain", ["&rectangle", "&elliptic disk", "&torus"]],
+    ["&domain", ["&rectangle", "&elliptic disk", "&orbit", orbit_sgn]],
     ['&method', ["&finite elements", "&virtual elements"]],
 ]
 
@@ -108,7 +108,7 @@ def main():
         elif event == "virtual elements":
             model = VEM.Model(model.domain, model.bounds, model.resolution, model.isTraceFixed, model.computeSpectrumOnBake)
 
-        elif event in ["rectangle", "elliptic disk", "torus"]:
+        elif event in ["rectangle", "elliptic disk"] + orbit_sgn:
             model.domain = event
             model.bake()
         elif event in ["inp_res0", "inp_res1"]:
