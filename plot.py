@@ -33,8 +33,9 @@ def complex(ax, vertices, triangles, u):
     ax.set_aspect("equal")
 
 def surface(ax, vertices, triangles, u):
-    ax.set(xlabel='X', ylabel='Y')
     ax.plot_trisurf(vertices[0, :], vertices[1, :], triangles, u, cmap="Blues")
+    ax.set(xlabel='X', ylabel='Y')
+    #ax.set_aspect("equal")
 
 
 def add_wireframe(ax, vertices, polygons, u=None):

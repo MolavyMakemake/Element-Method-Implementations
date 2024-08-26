@@ -1,11 +1,25 @@
 import numpy as np
+from mesh import *
 
-orbit_sgn_11 = ["p1 (o)"]
-orbit_sgn_12 = ["p2 (2222)", "pm (**)", "pg (xx)"]
-orbit_sgn_24 = ["cm (*x)", "pmm (*2222)", "pmg (22*)", "pgg (22x)", "cmm (2*22)"]
+orbit_sgn_r1 = ["p1 (o)", "pm (**)", "pg (xx)", "cm (*x)"]
+orbit_sgn_r2 = ["p2 (2222)", "pmm (*2222)", "pmg (22*)", "pgg (22x)", "cmm (2*22)"]
+orbit_sgn_r3 = ["p3 (333)", "p3m1 (*333)", "p31m (3*3)"]
+orbit_sgn_r4 = ["p4 (442)", "p4m (*442)", "p4g (4*2)"]
+orbit_sgn_r6 = ["p6 (632)", "p6m (*632)"]
 
-orbit_sgn = orbit_sgn_11 + orbit_sgn_12 + orbit_sgn_24
+orbit_sgn = orbit_sgn_r1 + orbit_sgn_r2 \
+            + orbit_sgn_r3 + orbit_sgn_r4 + orbit_sgn_r6
 
+
+def mesh(signature, res_x, res_y, nV=3):
+    if signature in orbit_sgn_r1 + orbit_sgn_r2:
+        return square(res_x, res_y, nV)
+
+    if signature in orbit_sgn_r4:
+        return square(res_x, res_x, nV)
+
+    if signature in orbit_sgn_r3 + orbit_sgn_r6:
+        return triangle(res_x, nV)
 
 def compute_idmap(signature, W, H):
     idmap = [{i} for i in range(W*H)]

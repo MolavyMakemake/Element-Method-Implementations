@@ -14,8 +14,9 @@ from orbifolds import *
 
 menu_def = [
     ["&solve", ["&poisson", "&spectrum"]],
-    ["&domain", ["&rectangle", "&elliptic disk", "&orbit",
-                 orbit_sgn_11 + ["---"] + orbit_sgn_12 + ["---"] + orbit_sgn_24]],
+    ["&domain", ["&rectangle", "&elliptic disk", "rhombus", "triangle", "&orbit",
+                 orbit_sgn_r1 + ["---"] + orbit_sgn_r2 + ["---"] +
+                 orbit_sgn_r3 + ["---"] + orbit_sgn_r4 + ["---"] + orbit_sgn_r6]],
     ['&method', ["&finite elements", "&virtual elements"]],
 ]
 
@@ -110,7 +111,7 @@ def main():
             model = VEM.Model(model.domain, model.bounds, model.resolution,
                               model.isTraceFixed, model.computeSpectrumOnBake)
 
-        elif event in ["rectangle", "elliptic disk"] + orbit_sgn:
+        elif event in ["rectangle", "elliptic disk", "rhombus", "triangle"] + orbit_sgn:
             model.domain = event
             model.bake()
         elif event in ["inp_res0", "inp_res1"]:
@@ -157,7 +158,7 @@ def main():
                 print("Invalid bounds")
                 continue
 
-            model.bake_vertices()
+            model.bake()
 
         try:
             if solve == "poisson":
