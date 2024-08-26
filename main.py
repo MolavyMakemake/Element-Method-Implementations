@@ -10,11 +10,12 @@ import VEM
 import plot
 
 matplotlib.use('TkAgg')
-from orbifolds import orbit_sgn
+from orbifolds import *
 
 menu_def = [
     ["&solve", ["&poisson", "&spectrum"]],
-    ["&domain", ["&rectangle", "&elliptic disk", "&orbit", orbit_sgn]],
+    ["&domain", ["&rectangle", "&elliptic disk", "&orbit",
+                 orbit_sgn_11 + ["---"] + orbit_sgn_12 + ["---"] + orbit_sgn_24]],
     ['&method', ["&finite elements", "&virtual elements"]],
 ]
 
@@ -32,12 +33,12 @@ layout = [
      sg.Input("21", s=(2, None), key="inp_res0", pad=0), sg.Text("x", pad=0),
      sg.Input("21", s=(2, None), key="inp_res1", pad=0)],
 
-    [sg.Text("f(z) =", key="txt_f"), sg.Input("np.exp(-20 * z * np.conj(z))", key="inp_f"),
+    [sg.Text("f(z) =", key="txt_f"), sg.Input("0.1414 * np.sin(2.718*np.imag(z)) + 20 * np.divide(0.314 + 0.2414j, z**2, out=np.zeros_like(z), where=np.abs(z)>1)", key="inp_f"),
      sg.Button("view eigenvectors", key="btn_eigen", visible=False),
      sg.Checkbox("fix trace", key="fix trace", default=True, visible=False, enable_events=True)],
 
     [sg.HorizontalSeparator()],
-    [sg.Checkbox("complex plot", key="cplot", default=False, enable_events=True)],
+    [sg.Checkbox("complex plot", key="cplot", default=True, enable_events=True)],
     [sg.Canvas(key="solution_plot"), sg.Canvas(key="matrix_plot")],
 ]
 
@@ -62,17 +63,16 @@ def main():
 
     solution_canvas = window["solution_plot"].TKCanvas
     matrix_canvas = window["matrix_plot"].TKCanvas
-    solution_figCanvasAgg = FigureCanvasTkAgg(rplot_fig, solution_canvas)
+    solution_figCanvasAgg = FigureCanvasTkAgg(cplot_fig, solution_canvas)
     matrix_figCanvasAgg = FigureCanvasTkAgg(matrix_fig, matrix_canvas)
 
     solution_figCanvasAgg.get_tk_widget().pack(side='top', fill='both', expand=1)
     matrix_figCanvasAgg.get_tk_widget().pack(side='top', fill='both', expand=1)
 
     model = FEM.Model()
-    u = model.solve_poisson(lambda z: np.exp(-20 * z * np.conj(z)))
+    u = model.solve_poisson(lambda z: 0.1414 * np.sin(2.718*np.imag(z)) + 20 * np.divide(0.314 + 0.2414j, z**2, out=np.zeros_like(z), where=np.abs(z)>1))
 
-    u = np.real(u)
-    plot.surface(rplot_ax, model.vertices, model.triangles, u)
+    plot.complex(cplot_ax, model.vertices, model.triangles, u)
     plot.add_wireframe(rplot_ax, model.vertices, model.polygons, u)
     matrix_axs[0].matshow(model.L)
     matrix_axs[1].matshow(model.M)
@@ -81,7 +81,7 @@ def main():
 
     solve = "poisson"
     eigen_i = 0
-    isPlotComplex = False
+    isPlotComplex = True
     while True:
         event, values = window.read()
         print("event:", event)
@@ -104,9 +104,11 @@ def main():
                 model.bake_spectrum()
 
         elif event == "finite elements":
-            model = FEM.Model(model.domain, model.bounds, model.resolution, model.isTraceFixed, model.computeSpectrumOnBake)
+            model = FEM.Model(model.domain, model.bounds, model.resolution,
+                              model.isTraceFixed, model.computeSpectrumOnBake)
         elif event == "virtual elements":
-            model = VEM.Model(model.domain, model.bounds, model.resolution, model.isTraceFixed, model.computeSpectrumOnBake)
+            model = VEM.Model(model.domain, model.bounds, model.resolution,
+                              model.isTraceFixed, model.computeSpectrumOnBake)
 
         elif event in ["rectangle", "elliptic disk"] + orbit_sgn:
             model.domain = event
@@ -117,8 +119,9 @@ def main():
                 model.resolution[1] = int(values["inp_res1"])
             except ValueError:
                 print("Invalid resolution")
-
+                continue
             model.bake()
+
         elif event == "btn_eigen":
             popup_layout = [[sg.Column(
                 [[sg.Text(f"{model.eigenvalues[i]:.5f}"), sg.Button("view", key=str(i))]
@@ -144,14 +147,17 @@ def main():
                 solution_figCanvasAgg = FigureCanvasTkAgg(rplot_fig, solution_canvas)
             solution_figCanvasAgg.get_tk_widget().pack(side='top', fill='both', expand=1)
 
-        try:
-            model.bounds = np.array([
-                [float(values["inp_x0"]), float(values["inp_x1"])],
-                [float(values["inp_y0"]), float(values["inp_y1"])]
-            ])
-        except ValueError:
-            print("Invalid bounds")
-            continue
+        elif event in ["inp_x0", "inp_x1", "inp_y0", "inp_y1"]:
+            try:
+                model.bounds = np.array([
+                    [float(values["inp_x0"]), float(values["inp_x1"])],
+                    [float(values["inp_y0"]), float(values["inp_y1"])]
+                ])
+            except ValueError:
+                print("Invalid bounds")
+                continue
+
+            model.bake_vertices()
 
         try:
             if solve == "poisson":

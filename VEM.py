@@ -1,5 +1,8 @@
 import numpy as np
 
+import orbifolds
+
+
 class Model:
     def __init__(self, domain="rectangle", bounds=np.array([[-1, 1], [-1, 1]]),
                  resolution=[21, 21], isTraceFixed=True, computeSpectrumOnBake=False):
@@ -30,7 +33,8 @@ class Model:
 
     def bake(self):
         self._bake_domain()
-        self._bake_data()
+        self.bake_vertices()
+        self._bake_triangles()
         self._bake_matrices()
 
         if self.computeSpectrumOnBake:
@@ -52,7 +56,6 @@ class Model:
                 i = W * y_i + x_i
                 self.polygons.append([i, i + 1, i + W + 1, i + W])
 
-
         if self.domain == "elliptic disk":
             for v in self._vertices_normalized.T:
                 if abs(v[0]) > abs(v[1]):
@@ -61,18 +64,19 @@ class Model:
                     v /= np.linalg.norm(v / v[1])
 
         self._identify = [[], []]
-        if self.domain == "torus":
-            for i in range(0, W - 1):
-                self.identify(W * (H - 1) + i, i)
-            for i in range(0, H - 1):
-                self.identify(W * (i + 1) - 1, W * i)
+        self._exclude = []
+        if self.domain in orbifolds.orbit_sgn:
+            self._identify = orbifolds.compute_idmap(self.domain, W, H)
+            self._exclude.extend(self._identify[0])
 
-            self.identify(W * H - 1, 0)
+            if self.isTraceFixed:
+                self._exclude.append(self._identify[1][-1])
 
-        self._exclude = self._identify[0].copy()
-
-        if not self.isTraceFixed:
-            return
+        elif self.isTraceFixed:
+            self._exclude.extend(range(W))
+            self._exclude.extend(range(W * (H - 1), W * H))
+            self._exclude.extend(range(W, W * (H - 1), W))
+            self._exclude.extend(range(2 * W - 1, W * H - 1, W))
 
         if self.domain in ["rectangle", "elliptic disk"]:
             self._exclude.extend(range(W))
@@ -80,14 +84,12 @@ class Model:
             self._exclude.extend(range(W, W * (H - 1), W))
             self._exclude.extend(range(2 * W - 1, W * H - 1, W))
 
-        elif self.domain == "torus":
-            self._exclude.append(0)
 
     def identify(self, i, j):
         self._identify[0].append(i)
         self._identify[1].append(j)
 
-    def _bake_data(self):
+    def bake_vertices(self):
         bounds_offset = self.bounds[:, 0] - np.array([-1, -1])
         bounds_mat = 0.5 * np.array([
             [self.bounds[0, 1] - self.bounds[0, 0], 0],
@@ -95,6 +97,7 @@ class Model:
         ])
         self.vertices = np.reshape(bounds_offset, [2, 1]) + bounds_mat @ self._vertices_normalized
 
+    def _bake_triangles(self):
         self.triangles = []
         for p_i in self.polygons:
             for i in range(2, len(p_i)):
@@ -164,14 +167,15 @@ class Model:
     def solve_poisson(self, f):
         u = np.zeros(np.size(self.vertices, axis=1), dtype=complex)
 
-        #I_f = np.zeros(len(self.polygons), dtype=complex)
-        #for p_i, p_I in enumerate(self.polygons):
-        #    p = self.vertices[:, p_I]
-        #    I_f[p_i] = np.average(f(p[0, :] + 1j * p[1, :])) * self._area[p_i]
-        # b = self.I @ I_f
+        I_f = np.zeros(len(self.polygons), dtype=complex)
+        for p_i, p_I in enumerate(self.polygons):
+            p = self.vertices[:, p_I]
+            I_f[p_i] = np.average(f(p[0, :] + 1j * p[1, :])) * self._area[p_i]
+        b = self.I @ I_f
+        #p = self.vertices[:, self._mask]
+        #b = self.M @ f(p[0, :] + 1j * p[1, :])
 
-        p = self.vertices[:, self._mask]
-        u[self._mask] = np.linalg.solve(self.L, self.M @ f(p[0, :] + 1j * p[1, :]))
+        u[self._mask] = np.linalg.solve(self.L, b)
 
         u[self._identify[0]] = u[self._identify[1]]
         return u

@@ -6,23 +6,30 @@ from matplotlib.collections import LineCollection
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
 alpha_gradiant = {
-    'alpha': [(0, 0, 0),
-            (1, 1, 0)],
+    'alpha': [(0, 0, 1),
+            (0.1, 0.5, 0.5),
+            (0.5, 0, 0),
+            (1, 0.5, 0)],
     'red': [(0, 0, 0),
-            (1, 0, 0)],
+            (1, 1, 0)],
     'green': [(0, 0, 0),
-            (1, 0, 0)],
+            (1, 1, 0)],
     'blue': [(0, 0, 0),
-            (1, 0, 0)]
+            (1, 1, 0)]
 }
 
 alpha_cm = colors.LinearSegmentedColormap('my_colormap2',alpha_gradiant,256)
 
 def complex(ax, vertices, triangles, u):
     tr = tri.Triangulation(vertices[0, :], vertices[1, :], triangles)
-    ax.tricontourf(tr, np.angle(u), levels=100, vmin=-np.pi, vmax=np.pi, cmap='hsv')
-    ax.tricontourf(tr, np.abs(u), cmap=alpha_cm)
-    ax.set(xlim=(-1, 1), ylim=(-1, 1), xlabel='X', ylabel='Y')
+    arg = np.angle(u) / np.pi + 1
+    arg = np.minimum(arg, 2 - arg)
+
+    shade = np.log(np.maximum(np.abs(u), 0.01))
+
+    ax.tricontourf(tr, arg, levels=50, vmin=0, vmax=1, cmap='hsv')
+    ax.tricontourf(tr, shade, levels=30, cmap=alpha_cm)
+    #ax.set(xlim=(-1, 1), ylim=(-1, 1), xlabel='X', ylabel='Y')
     ax.set_aspect("equal")
 
 def surface(ax, vertices, triangles, u):

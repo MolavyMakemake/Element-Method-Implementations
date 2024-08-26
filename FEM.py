@@ -4,7 +4,8 @@ import orbifolds
 
 
 class Model:
-    def __init__(self, domain="rectangle", bounds=np.array([[-1, 1], [-1, 1]]), resolution=[21, 21], isTraceFixed=True, computeSpectrumOnBake=False):
+    def __init__(self, domain="rectangle", bounds=np.array([[-1, 1], [-1, 1]]), resolution=[21, 21]
+                 , isTraceFixed=True, computeSpectrumOnBake=False):
         self.bounds = bounds
         self.resolution = resolution
         self.domain = domain
@@ -30,7 +31,8 @@ class Model:
 
     def bake(self):
         self._bake_domain()
-        self._bake_data()
+        self.bake_vertices()
+        self._bake_triangles()
         self._bake_matrices()
 
         if self.computeSpectrumOnBake:
@@ -61,12 +63,13 @@ class Model:
                     v /= np.linalg.norm(v / v[1])
 
         self._identify = [[], []]
+        self._exclude = []
         if self.domain in orbifolds.orbit_sgn:
             self._identify = orbifolds.compute_idmap(self.domain, W, H)
-            self._exclude = self._identify[0].copy()
+            self._exclude.extend(self._identify[0])
 
             if self.isTraceFixed:
-                self._exclude.append(0)
+                self._exclude.append(self._identify[1][0])
 
         elif self.isTraceFixed:
             self._exclude.extend(range(W))
@@ -76,7 +79,7 @@ class Model:
 
         print(self._identify)
 
-    def _bake_data(self):
+    def bake_vertices(self):
         bounds_offset = self.bounds[:, 0] - np.array([-1, -1])
         bounds_mat = 0.5 * np.array([
             [self.bounds[0, 1] - self.bounds[0, 0], 0],
@@ -84,6 +87,7 @@ class Model:
         ])
         self.vertices = np.reshape(bounds_offset, [2, 1]) + bounds_mat @ self._vertices_normalized
 
+    def _bake_triangles(self):
         self.triangles = self.polygons
 
     def _bake_matrices(self):
