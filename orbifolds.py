@@ -84,8 +84,13 @@ def compute_idmap(signature, W, H):
         identify(W * (H-1) + x22 - y22, x22 + y22)
         identify(W*H - 1 - x12 - y12, x12 + y12)
 
-    elif signature == "p4 (*442)":
-        pass
+    elif signature == "p4 (442)":
+        x12 = np.arange(0, W2 * W) % W2
+        y14 = (np.arange(0, W2 * W) // W2) * W
+        i22 = np.arange(0, W2 * W2) % W2
+        j22 = np.arange(0, W2 * W2) // W2
+        identify(W * (H-1) - i22 * W + j22, i22 + j22 * W)
+        identify(W*H - 1 - x12 - y12, x12 + y12)
 
     identify(range(W * (H - 1), W * H - 1), range(0, W - 1))
     identify(range(W - 1, W * H - 1, W), range(0, W * (H - 1), W))

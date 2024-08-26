@@ -46,7 +46,7 @@ class Model:
         trace = []
 
         if self.domain in orbifolds.orbit_sgn:
-            self.vertices, self.polygons = orbifolds.mesh(self.domain, W, H)
+            self.vertices, self.polygons, trace = orbifolds.mesh(self.domain, W, H)
             self._identify = orbifolds.compute_idmap(self.domain, W, H)
             self._exclude.extend(self._identify[0])
 
