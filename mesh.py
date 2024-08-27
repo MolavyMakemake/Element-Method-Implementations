@@ -52,8 +52,10 @@ def triangle(res, nV=3):
     y = np.repeat(range(res), range(res, 0, -1))
     x = np.arange(res * (res + 1) // 2) - res * y + ((y - 1) * y) // 2
 
-    vertices[1, :] = 2 * y / (res - 1) - 1
-    vertices[0, :] = 2 * x / (res - 1) + 0.5 * vertices[1, :]
+    vertices[1, :] = y / (res - 1)
+
+    vertices[0, :] = 2 * x / (res - 1) - 1 + vertices[1, :]
+    vertices[1, :] = np.sqrt(3) * (vertices[1, :] - 1 / 3)
 
     i = 0
     while i < res * (res + 1) // 2 - 1:

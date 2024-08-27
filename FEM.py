@@ -50,7 +50,7 @@ class Model:
             self._identify = orbifolds.compute_idmap(self.domain, W, H)
             self._exclude.extend(self._identify[0])
 
-            trace.append(self._identify[1][0])
+            trace = [self._identify[1][0]]
 
         else:
             self.vertices, self.polygons, trace = mesh.generic(self.domain, W, H)
