@@ -150,10 +150,9 @@ def _idmap_r3(signature, W):
         idmap = IdMap(W*W)
         idmap.identify(range(W*W - 1, W-1, -W), range(0, W - 1))
         idmap.identify(range(W*W - 2, W * (W-1), -1), range(W, W * (W-1), W))
-
         return idmap.resolve()
 
-    elif signature == "p3m1 (*333)":
+    if signature == "p3m1 (*333)":
         j = np.repeat(range(W), range(W, 0, -1))
         i = np.arange(W * (W + 1) // 2) - W * j + ((j - 1) * j) // 2
 
@@ -161,8 +160,26 @@ def _idmap_r3(signature, W):
         idmap.identify(W*W - 1 - i * W - j, i + j * W)
         idmap.identify(range(W*W - 1, W-1, -W), range(0, W-1))
 
-    elif signature == "pm31 (3*3)":
-        pass
+    elif signature == "p31m (3*3)":
+        H = (W + 2) // 3
+        k = np.arange(H)
+        j = np.repeat(range(H), W - 3 * k)
+        x = np.arange(len(j)) + j ** 2
+        y = j * W - (j - 1) * j // 2
+        i = x - y
+
+        tri_1 = W * (i+1) - (i+1) * i // 2 - 1 - j
+        tri_2 = W * (W+1) // 2 - (i + j) * (i + j + 3) // 2 + j - 1
+
+        print(W)
+
+        idmap = IdMap((W+1) * W // 2)
+        idmap.identify(tri_1, x)
+        idmap.identify(tri_2, x)
+
+        r = np.arange(W)
+        idmap.identify(tri_1[r], r)
+        idmap.identify(tri_2[r], r)
 
     return idmap.resolve()
 
