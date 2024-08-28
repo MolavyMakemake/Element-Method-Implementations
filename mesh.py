@@ -78,16 +78,16 @@ def triangle(res, nV=3):
 
     return vertices, polygons, trace
 
-def generic(domain, res_x, res_y):
+def generic(domain, res_x, res_y, nV=3):
     if domain == "rectangle":
-        return square(res_x, res_y)
+        return square(res_x, res_y, nV)
 
     elif domain == "elliptic disk":
-        return disk(res_x, res_y)
+        return disk(res_x, res_y, nV)
 
     elif domain == "rhombus":
-        return rhombus(res_x, res_y)
+        return rhombus(res_x, res_y, nV)
 
     elif domain == "triangle":
-        return triangle(res_x)
+        return triangle(res_x, nV)
 

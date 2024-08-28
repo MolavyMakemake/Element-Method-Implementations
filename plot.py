@@ -6,9 +6,8 @@ from matplotlib.collections import LineCollection
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
 alpha_gradiant = {
-    'alpha': [(0, 0, 1),
-            (0.1, 0.5, 0.5),
-            (0.5, 0, 0),
+    'alpha': [(0, 0, 0.8),
+            (0.7, 0.3, 0.3),
             (1, 0.5, 0)],
     'red': [(0, 0, 0),
             (1, 1, 0)],
@@ -25,10 +24,10 @@ def complex(ax, vertices, triangles, u):
     arg = np.angle(u) / np.pi + 1
     arg = np.minimum(arg, 2 - arg)
 
-    shade = np.log(np.maximum(np.abs(u), 0.01))
+    shade = 0.5 * np.log(np.maximum(np.abs(u), 1e-10)) % 1
 
     ax.tricontourf(tr, arg, levels=50, vmin=0, vmax=1, cmap='hsv')
-    ax.tricontourf(tr, shade, levels=30, cmap=alpha_cm)
+    ax.tricontourf(tr, shade, levels=30, vmin=0, vmax=1, cmap=alpha_cm)
     #ax.set(xlim=(-1, 1), ylim=(-1, 1), xlabel='X', ylabel='Y')
     ax.set_aspect("equal")
 

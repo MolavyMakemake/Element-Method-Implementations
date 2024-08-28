@@ -1,7 +1,7 @@
 import numpy as np
 
 import orbifolds
-
+import mesh
 
 class Model:
     def __init__(self, domain="rectangle", bounds=np.array([[-1, 1], [-1, 1]]),
@@ -11,7 +11,6 @@ class Model:
         self.domain = domain
         self.isTraceFixed = isTraceFixed
 
-        self._vertices_normalized = []
         self._exclude = []
         self._identify = [[], []]
         self._area = []
@@ -33,69 +32,34 @@ class Model:
 
     def bake(self):
         self._bake_domain()
-        self.bake_vertices()
         self._bake_triangles()
         self._bake_matrices()
 
         if self.computeSpectrumOnBake:
             self.bake_spectrum()
 
+
     def _bake_domain(self):
-        W = self.resolution[0]
-        H = self.resolution[1]
-
-        self._vertices_normalized = np.zeros([2, W * H])
-        X, Y = np.meshgrid(np.linspace(-1, 1, W), np.linspace(-1, 1, H))
-
-        self._vertices_normalized[0, :] = X.flatten()
-        self._vertices_normalized[1, :] = Y.flatten()
-
-        self.polygons = []
-        for y_i in range(H - 1):
-            for x_i in range(W - 1):
-                i = W * y_i + x_i
-                self.polygons.append([i, i + 1, i + W + 1, i + W])
-
-        if self.domain == "elliptic disk":
-            for v in self._vertices_normalized.T:
-                if abs(v[0]) > abs(v[1]):
-                    v /= np.linalg.norm(v / v[0])
-                elif v[1] != 0:
-                    v /= np.linalg.norm(v / v[1])
-
         self._identify = [[], []]
         self._exclude = []
+
+        W = self.resolution[0]
+        H = self.resolution[1]
+        trace = []
+
         if self.domain in orbifolds.orbit_sgn:
+            self.vertices, self.polygons, trace = orbifolds.mesh(self.domain, W, H, 4)
             self._identify = orbifolds.compute_idmap(self.domain, W, H)
             self._exclude.extend(self._identify[0])
 
-            if self.isTraceFixed:
-                self._exclude.append(self._identify[1][-1])
+            trace = [self._identify[1][0]]
 
-        elif self.isTraceFixed:
-            self._exclude.extend(range(W))
-            self._exclude.extend(range(W * (H - 1), W * H))
-            self._exclude.extend(range(W, W * (H - 1), W))
-            self._exclude.extend(range(2 * W - 1, W * H - 1, W))
+        else:
+            self.vertices, self.polygons, trace = mesh.generic(self.domain, W, H, 4)
 
-        if self.domain in ["rectangle", "elliptic disk"]:
-            self._exclude.extend(range(W))
-            self._exclude.extend(range(W * (H - 1), W * H))
-            self._exclude.extend(range(W, W * (H - 1), W))
-            self._exclude.extend(range(2 * W - 1, W * H - 1, W))
+        if self.isTraceFixed:
+            self._exclude.extend(trace)
 
-
-    def identify(self, i, j):
-        self._identify[0].append(i)
-        self._identify[1].append(j)
-
-    def bake_vertices(self):
-        bounds_offset = self.bounds[:, 0] - np.array([-1, -1])
-        bounds_mat = 0.5 * np.array([
-            [self.bounds[0, 1] - self.bounds[0, 0], 0],
-            [0, self.bounds[1, 1] - self.bounds[1, 0]]
-        ])
-        self.vertices = np.reshape(bounds_offset, [2, 1]) + bounds_mat @ self._vertices_normalized
 
     def _bake_triangles(self):
         self.triangles = []

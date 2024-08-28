@@ -48,11 +48,11 @@ def mesh(signature, res_x, res_y, nV=3):
     elif signature in orbit_sgn_r4:
         return square(res_x, res_x, nV)
 
-    elif signature in orbit_sgn_r6 + ["p31m (3*3)"]:
+    elif signature in ["p31m (3*3)", "p6m (*632)"]:
         return triangle(res_x, nV)
 
     else:
-        return rhombus(res_x, res_y, nV)
+        return rhombus(res_x, res_x, nV)
 
 
 def _idmap_r1(signature, W, H):
@@ -159,6 +159,7 @@ def _idmap_r3(signature, W):
         idmap = IdMap(W*W)
         idmap.identify(W*W - 1 - i * W - j, i + j * W)
         idmap.identify(range(W*W - 1, W-1, -W), range(0, W-1))
+        idmap.identify(range(W * W - 2, W * (W - 1), -1), range(W, W * (W - 1), W))
 
     elif signature == "p31m (3*3)":
         H = (W + 2) // 3
@@ -170,8 +171,6 @@ def _idmap_r3(signature, W):
 
         tri_1 = W * (i+1) - (i+1) * i // 2 - 1 - j
         tri_2 = W * (W+1) // 2 - (i + j) * (i + j + 3) // 2 + j - 1
-
-        print(W)
 
         idmap = IdMap((W+1) * W // 2)
         idmap.identify(tri_1, x)
@@ -218,10 +217,62 @@ def _idmap_r4(signature, W):
 
 def _idmap_r6(signature, W):
     if signature == "p6 (632)":
-        pass
+        H = (W + 2) // 3
+        k = np.arange(H)
+        j = np.repeat(range(H), W - 3 * k)
+        x = np.arange(len(j)) + j ** 2
+        y = j * W - (j - 1) * j // 2
+        i = x - y
+
+        j2 = np.repeat(range(W), range(W, 0, -1))
+        i2 = np.arange(W * (W + 1) // 2) - W * j2 + ((j2 - 1) * j2) // 2
+
+        tri_1 = W * (i + 1) - (i + 1) * i // 2 - 1 - j
+        tri_2 = W * (W + 1) // 2 - (i + j) * (i + j + 3) // 2 + j - 1
+
+        tri_1 += i * (i-1) // 2
+        tri_2 += (W-2 - i - j) * (W-1 - i - j) // 2
+        x += j * (j-1) // 2
+
+        idmap = IdMap(W * W)
+        idmap.identify(tri_1, x)
+        idmap.identify(tri_2, x)
+
+        idmap.identify(W*W - 1 - i2 - j2 * W, i2 + j2 * W)
+
+        idmap.identify(range(W * (W - 1), W * W - 1), range(0, W - 1))
+        idmap.identify(range(W - 1, W * W - 1, W), range(0, W * (W - 1), W))
+        idmap.identify([W * W - 1], [0])
+
+        return idmap.resolve()
 
     elif signature == "p6m (*632)":
-        pass
+        H = (W + 2) // 3
+        k = np.arange(H)
+        j = np.repeat(range(H), W - 3 * k)
+        x = np.arange(len(j)) + j ** 2
+        y = j * W - (j - 1) * j // 2
+        i = x - y
+
+        r2 = (W - 3 * k + 1) // 2
+        j2 = np.repeat(range(H), r2)
+        i2 = np.roll(r2, 1);
+        i2[0] = 0
+        i2 = np.arange(len(j2)) - np.repeat(np.cumsum(i2), r2)
+
+        tri_1 = W * (i + 1) - (i + 1) * i // 2 - 1 - j
+        tri_2 = W * (W + 1) // 2 - (i + j) * (i + j + 3) // 2 + j - 1
+
+        idmap = IdMap(W * W)
+        idmap.identify((j2+1) * W - j2 * (j2+1) // 2 - 1 - j2 - i2, j2 * W - j2 * (j2-1) // 2 + j2 + i2)
+        idmap.identify(tri_1, x)
+        idmap.identify(tri_2, x)
+
+        r = np.arange(W)
+        idmap.identify(tri_1[r], r)
+        idmap.identify(tri_2[r], r)
+
+        return idmap.resolve()
 
 
 def compute_idmap(signature, W, H):
