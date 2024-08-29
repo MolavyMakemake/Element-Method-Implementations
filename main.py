@@ -165,14 +165,14 @@ def main():
 
         try:
             if solve == "poisson":
-                u = model.solve_poisson(lambda z: eval(values["inp_f"]))
+                _z0 = model.vertices[0, 0] + 1j * model.vertices[1, 0]
+                u = model.solve_poisson(lambda z: eval(values["inp_f"], {"z": z, "np": np, "z0": _z0}))
             elif solve == "spectrum":
                 u = model.eigenvectors[eigen_i, :]
 
             if isPlotComplex:
                 cplot_ax.clear()
                 plot.complex(cplot_ax, model.vertices, model.triangles, u)
-
                 if values["cb_mesh"]:
                     plot.add_wireframe(cplot_ax, model.vertices, model.polygons)
 

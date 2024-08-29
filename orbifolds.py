@@ -15,7 +15,6 @@ class IdMap:
         self.idmap = [{i} for i in range(N)]
 
     def identify(self, I, J):
-        print(I, J)
         for i, j in zip(I, J):
             self.idmap[i].add(j)
 
