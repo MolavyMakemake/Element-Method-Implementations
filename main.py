@@ -11,6 +11,7 @@ import plot
 
 matplotlib.use('TkAgg')
 from orbifolds import *
+import time
 
 menu_def = [
     ["&solve", ["&poisson", "&spectrum"]],
@@ -31,15 +32,17 @@ layout = [
      sg.Input("1.0", s=(4, None), key="inp_y1", pad=0), sg.Text(")"),
 
      sg.Text(";   Resolution: "),
-     sg.Input("21", s=(2, None), key="inp_res0", pad=0), sg.Text("x", pad=0),
-     sg.Input("21", s=(2, None), key="inp_res1", pad=0)],
+     sg.Input("65", s=(2, None), key="inp_res0", pad=0), sg.Text("x", pad=0),
+     sg.Input("65", s=(2, None), key="inp_res1", pad=0)],
 
-    [sg.Text("f(z) =", key="txt_f"), sg.Input("0.1414 * np.sin(2.718*np.imag(z)) + 20 * np.divide(0.314 + 0.2414j, z**2, out=np.zeros_like(z), where=np.abs(z)>1)", key="inp_f"),
+    [sg.Text("f(z) =", key="txt_f"), sg.Input("np.ones_like(z)", key="inp_f"),
      sg.Button("view eigenvectors", key="btn_eigen", visible=False),
      sg.Checkbox("fix trace", key="fix trace", default=True, visible=False, enable_events=True)],
 
     [sg.HorizontalSeparator()],
-    [sg.Checkbox("complex plot", key="cplot", default=True, enable_events=True)],
+    [sg.Checkbox("complex plot", key="cb_cplot", default=True, enable_events=True),
+     sg.Checkbox("show mesh", key="cb_mesh", default=False, enable_events=True),
+     sg.Button("save", key="btn_save")],
     [sg.Canvas(key="solution_plot"), sg.Canvas(key="matrix_plot")],
 ]
 
@@ -70,8 +73,8 @@ def main():
     solution_figCanvasAgg.get_tk_widget().pack(side='top', fill='both', expand=1)
     matrix_figCanvasAgg.get_tk_widget().pack(side='top', fill='both', expand=1)
 
-    model = FEM.Model()
-    u = model.solve_poisson(lambda z: 0.1414 * np.sin(2.718*np.imag(z)) + 20 * np.divide(0.314 + 0.2414j, z**2, out=np.zeros_like(z), where=np.abs(z)>1))
+    model = FEM.Model(resolution=[25, 25])
+    u = model.solve_poisson(lambda z: np.ones_like(z))
 
     plot.complex(cplot_ax, model.vertices, model.triangles, u)
     plot.add_wireframe(rplot_ax, model.vertices, model.polygons, u)
@@ -138,7 +141,7 @@ def main():
             model.isTraceFixed = values["fix trace"]
             model.bake()
 
-        elif event == "cplot":
+        elif event == "cb_cplot":
             isPlotComplex = values[event]
 
             solution_figCanvasAgg.get_tk_widget().forget()
@@ -169,12 +172,23 @@ def main():
             if isPlotComplex:
                 cplot_ax.clear()
                 plot.complex(cplot_ax, model.vertices, model.triangles, u)
-                plot.add_wireframe(cplot_ax, model.vertices, model.polygons)
+
+                if values["cb_mesh"]:
+                    plot.add_wireframe(cplot_ax, model.vertices, model.polygons)
+
+                if event == "btn_save":
+                    plot.save(cplot_fig, str(model))
+
             else:
                 rplot_ax.clear()
                 u = np.real(u)
                 plot.surface(rplot_ax, model.vertices, model.triangles, u)
-                plot.add_wireframe(rplot_ax, model.vertices, model.polygons, u)
+
+                if values["cb_mesh"]:
+                    plot.add_wireframe(rplot_ax, model.vertices, model.polygons, u)
+
+                if event == "btn_save":
+                    plot.save(rplot_fig, str(model))
 
             matrix_axs[0].matshow(model.L)
             matrix_axs[1].matshow(model.M)

@@ -24,7 +24,11 @@ def complex(ax, vertices, triangles, u):
     arg = np.angle(u) / np.pi + 1
     arg = np.minimum(arg, 2 - arg)
 
-    shade = 0.5 * np.log(np.maximum(np.abs(u), 1e-10)) % 1
+    shade = np.abs(u)
+    shade = (shade - np.min(shade)) / (np.max(shade) - np.min(shade))
+    shade = np.log2(shade + 1)
+    #shade = 5 * np.log2(shade) % 1
+
 
     ax.tricontourf(tr, arg, levels=50, vmin=0, vmax=1, cmap='hsv')
     ax.tricontourf(tr, shade, levels=30, vmin=0, vmax=1, cmap=alpha_cm)
@@ -52,3 +56,14 @@ def add_wireframe(ax, vertices, polygons, u=None):
             lines.append(p)
 
         ax.add_collection(Line3DCollection(lines, linewidths=0.5, edgecolors="black"))
+
+
+def save(fig, id):
+    ax = fig.axes[0]
+
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    fig.savefig(f"{id}.jpg", bbox_inches='tight',pad_inches = 0)
+
+    ax.get_xaxis().set_visible(True)
+    ax.get_yaxis().set_visible(True)

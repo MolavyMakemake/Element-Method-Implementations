@@ -70,18 +70,21 @@ class Model:
     def _bake_matrices(self):
         n = 0
         elements = []
-        self._mask = []
+        elements_vI = []
+        self._mask = np.ones(np.size(self.vertices, axis=1), dtype=bool)
         self._area = []
 
         for i in range(np.size(self.vertices, axis=1)):
             if i in self._exclude:
                 elements.append(-1)
+                self._mask[i] = False
             else:
                 elements.append(n)
-                self._mask.append(i)
+                elements_vI.append(i)
                 n += 1
 
         self._elements = np.array(elements)
+        self._elements_v = np.array(elements_vI)
         self._elements[self._identify[0]] = self._elements[self._identify[1]]
 
         self.L = np.zeros([n, n])
@@ -133,8 +136,9 @@ class Model:
 
         I_f = np.zeros(len(self.polygons), dtype=complex)
         for p_i, p_I in enumerate(self.polygons):
-            p = self.vertices[:, p_I]
-            I_f[p_i] = np.average(f(p[0, :] + 1j * p[1, :])) * self._area[p_i]
+            e_I = self._elements[p_I]
+            p = self.vertices[:, self._elements_v[e_I]]
+            I_f[p_i] = np.average(f(p[0, :] + 1j * p[1, :]) * (e_I >= 0)) * self._area[p_i]
         b = self.I @ I_f
         #p = self.vertices[:, self._mask]
         #b = self.M @ f(p[0, :] + 1j * p[1, :])
@@ -152,3 +156,6 @@ class Model:
         u[:, self._mask] = eigenvectors
         self.eigenvectors = u / np.reshape(np.sqrt(np.real(
             np.sum((self.M @ eigenvectors) * np.conj(eigenvectors), axis=1))), [len(self.eigenvalues), 1])
+
+    def __str__(self):
+        return f"VEM-{self.domain}-{self.resolution[0]}x{self.resolution[1]}"

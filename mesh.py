@@ -57,17 +57,29 @@ def triangle(res, nV=3):
     vertices[0, :] = 2 * x / (res - 1) - 1 + vertices[1, :]
     vertices[1, :] = np.sqrt(3) * (vertices[1, :] - 1 / 3)
 
-    i = 0
-    while i < res * (res + 1) // 2 - 1:
-        W = int(res - y[i])
+    if nV == 4:
+        i = 0
+        while i < res * (res + 1) // 2 - 1:
+            W = int(res - y[i])
 
-        if x[i] >= W - 2:
-            polygons.append([i, i + 1, i + W])
-            i += 2
-        else:
-            polygons.append([i, i + 1, i + W])
-            polygons.append([i + 1, i + 1 + W, i + W])
-            i += 1
+            if x[i] >= W - 2:
+                polygons.append([i, i + 1, i + W])
+                i += 2
+            else:
+                polygons.append([i, i + 1, i+1 + W, i + W])
+                i += 1
+    else:
+        i = 0
+        while i < res * (res + 1) // 2 - 1:
+            W = int(res - y[i])
+
+            if x[i] >= W - 2:
+                polygons.append([i, i + 1, i + W])
+                i += 2
+            else:
+                polygons.append([i, i + 1, i + W])
+                polygons.append([i + 1, i + 1 + W, i + W])
+                i += 1
 
     trace = []
     k = np.arange(res - 1)

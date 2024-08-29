@@ -42,17 +42,17 @@ class IdMap:
         return idmap_sparse
 
 def mesh(signature, res_x, res_y, nV=3):
-    if signature in orbit_sgn_r1 + orbit_sgn_r2:
-        return square(res_x, res_y, nV)
+    if signature in ["cm (*x)", "p3 (333)", "p3m1 (*333)", "p6 (632)"]:
+        return rhombus(res_x, res_x, nV)
 
-    elif signature in orbit_sgn_r4:
+    elif signature in ["pgg (22x)", "cmm (2*22)", "p4 (442)", "p4m (*442)", "p4g (4*2)"]:
         return square(res_x, res_x, nV)
+
+    elif signature in orbit_sgn_r1 + orbit_sgn_r2:
+        return square(res_x, res_y, nV)
 
     elif signature in ["p31m (3*3)", "p6m (*632)"]:
         return triangle(res_x, nV)
-
-    else:
-        return rhombus(res_x, res_x, nV)
 
 
 def _idmap_r1(signature, W, H):
@@ -80,13 +80,16 @@ def _idmap_r1(signature, W, H):
         idmap.identify(W * H - W2 - y12 + x12, x12 + y12)
 
     elif signature == "cm (*x)":
-        idmap.identify(W2 - 1 - x14 + y14, x14 + y14)
-        idmap.identify(W - W2 + x22 + y22, W * H - W * H2 + x22 + y22)
-        idmap.identify(W * H - W * H2 + W - W2 + x22 + y22, x22 + y22)
+        idmap = IdMap(W * W)
 
-    idmap.identify(range(W * (H - 1), W * H - 1), range(0, W - 1))
-    idmap.identify(range(W - 1, W * H - 1, W), range(0, W * (H - 1), W))
-    idmap.identify([W * H - 1], [0])
+        j2 = np.repeat(range(W), range(W, 0, -1))
+        i2 = np.arange(W * (W + 1) // 2) - W * j2 + ((j2 - 1) * j2) // 2
+
+        idmap.identify(W * W - 1 - i2 * W - j2, i2 + j2 * W)
+        return idmap.resolve()
+
+    idmap.identify(range(W * (H - 1), W * H), range(0, W))
+    idmap.identify(range(W - 1, W * H, W), range(0, W * H, W))
 
     return idmap.resolve()
 
@@ -123,20 +126,25 @@ def _idmap_r2(signature, W, H):
         idmap.identify(W*H - 1 - x22 - y22, x22 + y22)
 
     elif signature == "pmg (22*)":
-        idmap.identify(W2 - 1 - x14 + y14, x14 + y14)
-        idmap.identify(W*H - W2 + x14 - y14, x14 + y14)
-        idmap.identify(W*H - 1 - x14 - y14, x14 + y14)
+        idmap.identify(W * (H-1) + W2 - 1 - x22 - y22, x22 + y22)
+        idmap.identify(W*H - W2 + x12 - y12, x12 + y12)
 
     elif signature == "pgg (22x)":
-        idmap.identify(W * (H2-1) + W2 - 1 - x24 - y24, x24 + y24)
-        idmap.identify(W * (H-1) + W2 - 1 - x24 - y24, W * (H-H2) + x24 + y24)
-        idmap.identify(W - 1 - x22 + y22, W*(H - H2) + x22 + y22)
-        idmap.identify(W*H - W2 + x22 - y22, x22 + y22)
+        j2 = np.repeat(range(W), range(W, 0, -1))
+        i2 = np.arange(W * (W + 1) // 2) - W * j2 + ((j2 - 1) * j2) // 2
+
+        idmap = IdMap(W * W)
+        idmap.identify(W*W - 1 - i2 - j2 * W, i2 + j2 * W)
+        idmap.identify(range(W-1, W*W, W), range(W))
+        return idmap.resolve()
 
     elif signature == "cmm (2*22)":
-        idmap.identify(W * (H2-1) + W2 - 1 - x24 - y24, x24 + y24)
-        idmap.identify(W * (H-1) + x22 - y22, x22 + y22)
-        idmap.identify(W*H - 1 - x12 - y12, x12 + y12)
+        j2 = np.repeat(range(W), range(W, 0, -1))
+        i2 = np.arange(W * (W + 1) // 2) - W * j2 + ((j2 - 1) * j2) // 2
+
+        idmap = IdMap(W * W)
+        idmap.identify(W * W - 1 - i2 - j2 * W, i2 + j2 * W)
+        return idmap.resolve()
 
     idmap.identify(range(W * (H - 1), W * H - 1), range(0, W - 1))
     idmap.identify(range(W - 1, W * H - 1, W), range(0, W * (H - 1), W))
@@ -184,35 +192,28 @@ def _idmap_r3(signature, W):
 
 
 def _idmap_r4(signature, W):
-    idmap = IdMap(W * W)
-
-    W2 = (W + 1) // 2
-    W4 = (W2 + 1) // 2
-
-    x12 = np.arange(0, W2 * W) % W2
-    y12 = (np.arange(0, W2 * W) // W2) * W
-    i22 = np.arange(0, W2 * W2) % W2
-    j22 = np.arange(0, W2 * W2) // W2
-
     if signature == "p4 (442)":
-        idmap.identify(W * (W - 1) - i22 * W + j22, i22 + j22 * W)
-        idmap.identify(W * W - 1 - x12 - y12, x12 + y12)
+        idmap = IdMap(W * W)
+        idmap.identify(range(W*W, W), range(W))
+        idmap.identify(range(W * (W-1), W*W), range(W-1, W*W, W))
+        return idmap.resolve()
 
     elif signature == "p4m (*442)":
-        idmap.identify(i22 * W + j22, i22 + j22 * W)
-        idmap.identify(W * (W - 1) + i22 - j22 * W, i22 + j22 * W)
-        idmap.identify(W * W - 1 - x12 - y12, x12 + y12)
+        j2 = np.repeat(range(W), range(W, 0, -1))
+        i2 = np.arange(W * (W + 1) // 2) - W * j2 + ((j2 - 1) * j2) // 2
+
+        idmap = IdMap(W * W)
+        idmap.identify(W * W - 1 - i2 * W - j2, i2 + j2 * W)
+        return idmap.resolve()
 
     elif signature == "p4g (4*2)":
-        idmap.identify(W2 * (W - 1) + W2 - 1 - j22 - i22 * W, i22 + j22 * W)
-        idmap.identify(W * (W - 1) - i22 * W + j22, i22 + j22 * W)
-        idmap.identify(W * W - 1 - x12 - y12, x12 + y12)
+        j2 = np.repeat(range(W), range(W, 0, -1))
+        i2 = np.arange(W * (W + 1) // 2) - W * j2 + ((j2 - 1) * j2) // 2
 
-    idmap.identify(range(W * (W - 1), W * W - 1), range(0, W - 1))
-    idmap.identify(range(W - 1, W * W - 1, W), range(0, W * (W - 1), W))
-    idmap.identify([W * W - 1], [0])
-
-    return idmap.resolve()
+        idmap = IdMap(W * W)
+        idmap.identify(W * W - 1 - i2 * W - j2, i2 + j2 * W)
+        idmap.identify(range(0, W*W, W), range(W))
+        return idmap.resolve()
 
 
 def _idmap_r6(signature, W):

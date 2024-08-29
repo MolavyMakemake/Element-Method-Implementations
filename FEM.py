@@ -97,18 +97,24 @@ class Model:
                 self.M[i, i] += m * 2
                 self.L[i, i] += l * np.dot(v1, v1)
                 if j >= 0:
-                    self.M[(i, j), (j, i)] += m
-                    self.L[(i, j), (j, i)] += l * np.dot(v1, v2)
+                    self.M[i, j] += m
+                    self.M[j, i] += m
+                    self.L[i, j] += l * np.dot(v1, v2)
+                    self.L[j, i] += l * np.dot(v1, v2)
                 if k >= 0:
-                    self.M[(i, k), (k, i)] += m
-                    self.L[(i, k), (k, i)] += l * np.dot(v1, v3)
+                    self.M[i, k] += m
+                    self.M[k, i] += m
+                    self.L[i, k] += l * np.dot(v1, v3)
+                    self.L[k, i] += l * np.dot(v1, v3)
 
             if j >= 0:
                 self.M[j, j] += m * 2
                 self.L[j, j] += l * np.dot(v2, v2)
                 if k >= 0:
-                    self.M[(j, k), (k, j)] += m
-                    self.L[(j, k), (k, j)] += l * np.dot(v2, v3)
+                    self.M[j, k] += m
+                    self.M[k, j] += m
+                    self.L[j, k] += l * np.dot(v2, v3)
+                    self.L[k, j] += l * np.dot(v2, v3)
 
             if k >= 0:
                 self.M[k, k] += m * 2
@@ -131,3 +137,6 @@ class Model:
         u[:, self._mask] = eigenvectors
         self.eigenvectors = u / np.reshape(np.sqrt(np.real(
             np.sum((self.M @ eigenvectors) * np.conj(eigenvectors), axis=1))), [len(self.eigenvalues), 1])
+
+    def __str__(self):
+        return f"FEM-{self.domain}-{self.resolution[0]}x{self.resolution[1]}"
