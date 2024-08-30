@@ -165,8 +165,7 @@ def main():
 
         try:
             if solve == "poisson":
-                _z0 = model.vertices[0, 0] + 1j * model.vertices[1, 0]
-                u = model.solve_poisson(lambda z: eval(values["inp_f"], {"z": z, "np": np, "z0": _z0}))
+                u = model.solve_poisson(lambda z: eval(values["inp_f"], {"z": z, "np": np, "z0": model.fd_center()}))
             elif solve == "spectrum":
                 u = model.eigenvectors[eigen_i, :]
 

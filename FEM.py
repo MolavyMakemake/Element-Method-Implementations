@@ -140,3 +140,6 @@ class Model:
 
     def __str__(self):
         return f"FEM-{self.domain}-{self.resolution[0]}x{self.resolution[1]}"
+
+    def fd_center(self):
+        return np.average(self.vertices[0, self._mask] + 1j * self.vertices[1, self._mask])
