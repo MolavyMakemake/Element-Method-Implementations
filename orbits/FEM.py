@@ -2,7 +2,7 @@ import numpy as np
 
 import mesh
 import orbifolds
-
+import scipy.sparse as sp
 
 class Model:
     def __init__(self, domain="rectangle", bounds=np.array([[-1, 1], [-1, 1]]), resolution=[21, 21]
@@ -22,6 +22,8 @@ class Model:
         self.L = np.array([[]])
         self.M = np.array([[]])
         self._mask = []
+
+        self.k = 10;
 
         self.eigenvectors = []
         self.eigenvalues = []
@@ -51,6 +53,7 @@ class Model:
             self._exclude.extend(self._identify[0])
 
             trace = [0]
+            trace = []
 
         else:
             self.vertices, self.polygons, trace = mesh.generic(self.domain, W, H)
@@ -79,8 +82,9 @@ class Model:
         self._elements = np.array(elements)
         self._elements[self._identify[0]] = self._elements[self._identify[1]]
 
-        self.L = np.zeros([n, n])
-        self.M = np.zeros([n, n])
+        L = np.zeros([n, n])
+        M = np.zeros([n, n])
+        I = np.zeros(n)
 
         for v_i, v_j, v_k in self.polygons:
             v1 = self.vertices[:, v_k] - self.vertices[:, v_j]
@@ -94,49 +98,58 @@ class Model:
             i, j, k = self._elements[v_i], self._elements[v_j], self._elements[v_k]
 
             if i >= 0:
-                self.M[i, i] += m * 2
-                self.L[i, i] += l * np.dot(v1, v1)
+                M[i, i] += m * 2
+                L[i, i] += l * np.dot(v1, v1)
+                I[i] += m * 4
                 if j >= 0:
-                    self.M[i, j] += m
-                    self.M[j, i] += m
-                    self.L[i, j] += l * np.dot(v1, v2)
-                    self.L[j, i] += l * np.dot(v1, v2)
+                    M[i, j] += m
+                    M[j, i] += m
+                    L[i, j] += l * np.dot(v1, v2)
+                    L[j, i] += l * np.dot(v1, v2)
                 if k >= 0:
-                    self.M[i, k] += m
-                    self.M[k, i] += m
-                    self.L[i, k] += l * np.dot(v1, v3)
-                    self.L[k, i] += l * np.dot(v1, v3)
+                    M[i, k] += m
+                    M[k, i] += m
+                    L[i, k] += l * np.dot(v1, v3)
+                    L[k, i] += l * np.dot(v1, v3)
 
             if j >= 0:
-                self.M[j, j] += m * 2
-                self.L[j, j] += l * np.dot(v2, v2)
+                M[j, j] += m * 2
+                L[j, j] += l * np.dot(v2, v2)
+                I[j] += m * 4
                 if k >= 0:
-                    self.M[j, k] += m
-                    self.M[k, j] += m
-                    self.L[j, k] += l * np.dot(v2, v3)
-                    self.L[k, j] += l * np.dot(v2, v3)
+                    M[j, k] += m
+                    M[k, j] += m
+                    L[j, k] += l * np.dot(v2, v3)
+                    L[k, j] += l * np.dot(v2, v3)
 
             if k >= 0:
-                self.M[k, k] += m * 2
-                self.L[k, k] += l * np.dot(v3, v3)
+                M[k, k] += m * 2
+                L[k, k] += l * np.dot(v3, v3)
+                I[k] += m * 4
+
+        self.L = sp.csc_matrix(L)
+        self.M = sp.csc_matrix(M)
+        self.I = I
 
     def solve_poisson(self, f):
         u = np.zeros(np.size(self.vertices, axis=1), dtype=complex)
 
-        b = self.M @ f(self.vertices[0, self._mask] + 1j * self.vertices[1, self._mask])
-        u[self._mask] = np.linalg.solve(self.L, b)
+        b = f(self.vertices[0, self._mask] + 1j * self.vertices[1, self._mask])
+        if self.domain in orbifolds.orbit_sgn:
+            b -= self.I @ b / np.sum(self.I)
+
+        b = self.M @ b
+        u[self._mask] = sp.linalg.spsolve(self.L, b)
+        #u -= u[0]
 
         u[self._identify[0]] = u[self._identify[1]]
         return u
 
     def bake_spectrum(self):
-        u = np.zeros((len(self._mask), np.size(self.vertices, axis=1)), dtype=complex)
-
-        self.eigenvalues, eigenvectors = np.linalg.eig(np.linalg.inv(self.L) @ self.M)
-
-        u[:, self._mask] = eigenvectors
-        self.eigenvectors = u / np.reshape(np.sqrt(np.real(
-            np.sum((self.M @ eigenvectors) * np.conj(eigenvectors), axis=1))), [len(self.eigenvalues), 1])
+        k = min(len(self._mask) - 2, 40)
+        self.eigenvectors = np.zeros((np.size(self.vertices, axis=1), k), dtype=complex)
+        self.eigenvalues, self.eigenvectors[self._mask, :] = sp.linalg.eigs(self.M, k, M=self.L, sigma=0.01)
+        self.eigenvectors[self._identify[0], :] = self.eigenvectors[self._identify[1], :]
 
     def __str__(self):
         return f"FEM-{self.domain}-{self.resolution[0]}x{self.resolution[1]}"

@@ -25,7 +25,7 @@ def complex(ax, vertices, triangles, u):
     arg = np.minimum(arg, 2 - arg)
 
     shade = np.abs(u)
-    shade = (shade - np.min(shade)) / (np.max(shade) - np.min(shade))
+    shade = (shade - np.min(shade)) / max((np.max(shade) - np.min(shade), 1e-15))
     shade = np.log2(shade + 1)
     #shade = 5 * np.log2(shade) % 1
 
