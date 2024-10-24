@@ -13,26 +13,28 @@ orbit_sgn = orbit_sgn_r1 + orbit_sgn_r2 \
 class IdMap:
     def __init__(self, N):
         self.idmap = [{i} for i in range(N)]
+        self._domain = set()
 
     def identify(self, I, J):
+        self._domain.update(J)
         for i, j in zip(I, J):
             self.idmap[i].add(j)
 
     def resolve(self):
-        for j in range(len(self.idmap)):
-            I = self.idmap[j].copy()
+        for idmap_j in self.idmap:
+            I = idmap_j.copy()
             while len(I) > 0:
                 i = I.pop()
-                if self.idmap[i] is self.idmap[j]:
+                if self.idmap[i] is idmap_j:
                     continue
 
-                self.idmap[j].update(self.idmap[i])
+                idmap_j.update(self.idmap[i])
                 I.update(self.idmap[i])
 
-                self.idmap[i] = self.idmap[j]
+                self.idmap[i] = idmap_j
 
         idmap_sparse = [[], []]
-        for j in range(len(self.idmap)):
+        for j in self._domain:
             self.idmap[j].discard(j)
             idmap_sparse[0].extend(self.idmap[j])
             idmap_sparse[1].extend([j] * len(self.idmap[j]))
@@ -85,6 +87,8 @@ def _idmap_r1(signature, W, H):
         i2 = np.arange(W * (W + 1) // 2) - W * j2 + ((j2 - 1) * j2) // 2
 
         idmap.identify(W * W - 1 - i2 * W - j2, i2 + j2 * W)
+        idmap.identify(range(W * (W - 1), W * W), range(0, W))
+        idmap.identify(range(W - 1, W * W, W), range(0, W * W, W))
         return idmap.resolve()
 
     idmap.identify(range(W * (H - 1), W * H), range(0, W))
@@ -142,7 +146,7 @@ def _idmap_r2(signature, W, H):
         i2 = np.arange(W * (W + 1) // 2) - W * j2 + ((j2 - 1) * j2) // 2
 
         idmap = IdMap(W * W)
-        idmap.identify(W * W - 1 - i2 - j2 * W, i2 + j2 * W)
+        idmap.identify(W*W - 1 - i2 - j2 * W, i2 + j2 * W)
         return idmap.resolve()
 
     idmap.identify(range(W * (H - 1), W * H - 1), range(0, W - 1))
@@ -183,17 +187,13 @@ def _idmap_r3(signature, W):
         idmap.identify(tri_1, x)
         idmap.identify(tri_2, x)
 
-        r = np.arange(W)
-        idmap.identify(tri_1[r], r)
-        idmap.identify(tri_2[r], r)
-
     return idmap.resolve()
 
 
 def _idmap_r4(signature, W):
     if signature == "p4 (442)":
         idmap = IdMap(W * W)
-        idmap.identify(range(W*W, W), range(W))
+        idmap.identify(range(0, W*W, W), range(W))
         idmap.identify(range(W * (W-1), W*W), range(W-1, W*W, W))
         return idmap.resolve()
 
@@ -240,10 +240,8 @@ def _idmap_r6(signature, W):
 
         idmap.identify(W*W - 1 - i2 - j2 * W, i2 + j2 * W)
 
-        idmap.identify(range(W * (W - 1), W * W - 1), range(0, W - 1))
-        idmap.identify(range(W - 1, W * W - 1, W), range(0, W * (W - 1), W))
-        idmap.identify([W * W - 1], [0])
-
+        idmap.identify(range(W * (W - 1), W * W), range(0, W))
+        idmap.identify(range(W - 1, W * W, W), range(0, W * W, W))
         return idmap.resolve()
 
     elif signature == "p6m (*632)":
@@ -267,10 +265,6 @@ def _idmap_r6(signature, W):
         idmap.identify((j2+1) * W - j2 * (j2+1) // 2 - 1 - j2 - i2, j2 * W - j2 * (j2-1) // 2 + j2 + i2)
         idmap.identify(tri_1, x)
         idmap.identify(tri_2, x)
-
-        r = np.arange(W)
-        idmap.identify(tri_1[r], r)
-        idmap.identify(tri_2[r], r)
 
         return idmap.resolve()
 

@@ -63,7 +63,7 @@ def save(fig, id):
 
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
-    fig.savefig(f"{id}.jpg", bbox_inches='tight',pad_inches = 0)
+    fig.savefig(f"{id.replace(' ', '-').replace('*', '¤')}.jpg", bbox_inches='tight', pad_inches=0, format="jpg")
 
     ax.get_xaxis().set_visible(True)
     ax.get_yaxis().set_visible(True)
