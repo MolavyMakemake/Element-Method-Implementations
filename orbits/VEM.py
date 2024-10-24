@@ -2,6 +2,7 @@ import numpy as np
 
 import orbifolds
 import mesh
+import scipy.sparse as sp
 
 class Model:
     def __init__(self, domain="rectangle", bounds=np.array([[-1, 1], [-1, 1]]),
@@ -53,6 +54,7 @@ class Model:
             self._exclude.extend(self._identify[0])
 
             trace = [0]
+            trace = []
 
         else:
             self.vertices, self.polygons, trace = mesh.generic(self.domain, W, H, 4)
@@ -87,8 +89,8 @@ class Model:
         self._elements_v = np.array(elements_vI)
         self._elements[self._identify[0]] = self._elements[self._identify[1]]
 
-        self.L = np.zeros([n, n])
-        self.I = np.zeros([n, len(self.polygons)])
+        L = np.zeros([n, n])
+        I = np.zeros([n, len(self.polygons)])
 
         rot = np.array([[0, 1], [-1, 0]])
 
@@ -125,11 +127,13 @@ class Model:
                     a = np.dot(proj_D[:, i], proj_D[:, j]) * area
                     s = np.sum((d_ik - proj_a[i] - proj_D[:, i] @ p1) * (d_jk - proj_a[j] - proj_D[:, j] @ p1))
 
-                    self.L[e_i, e_j] += a + s
+                    L[e_i, e_j] += a + s
 
-                self.I[e_i, p_i] += 1 / N
+                I[e_i, p_i] += 1 / N
 
-        self.M = (self.I * self._area) @ np.transpose(self.I)
+        self.I = I
+        self.L = sp.csc_matrix(L)
+        self.M = sp.csc_matrix((self.I * self._area) @ np.transpose(self.I))
 
     def solve_poisson(self, f):
         u = np.zeros(np.size(self.vertices, axis=1), dtype=complex)
@@ -139,23 +143,25 @@ class Model:
             e_I = self._elements[p_I]
             p = self.vertices[:, self._elements_v[e_I]]
             I_f[p_i] = np.average(f(p[0, :] + 1j * p[1, :]) * (e_I >= 0)) * self._area[p_i]
+
+        if self.domain in orbifolds.orbit_sgn:
+            I_f -= np.average(I_f)
+
         b = self.I @ I_f
         #p = self.vertices[:, self._mask]
         #b = self.M @ f(p[0, :] + 1j * p[1, :])
 
-        u[self._mask] = np.linalg.solve(self.L, b)
+        u[self._mask] = sp.linalg.spsolve(self.L, b)
+        u -= u[0]
 
         u[self._identify[0]] = u[self._identify[1]]
         return u
 
     def bake_spectrum(self):
-        u = np.zeros((len(self._mask), np.size(self.vertices, axis=1)), dtype=complex)
-
-        self.eigenvalues, eigenvectors = np.linalg.eig(np.linalg.inv(self.L) @ self.M)
-
-        u[:, self._mask] = eigenvectors
-        self.eigenvectors = u / np.reshape(np.sqrt(np.real(
-            np.sum((self.M @ eigenvectors) * np.conj(eigenvectors), axis=1))), [len(self.eigenvalues), 1])
+        k = min(len(self._mask) - 2, 40)
+        self.eigenvectors = np.zeros((np.size(self.vertices, axis=1), k), dtype=complex)
+        self.eigenvalues, self.eigenvectors[self._mask, :] = sp.linalg.eigs(self.M, k, M=self.L, sigma=0.01)
+        self.eigenvectors[self._identify[0], :] = self.eigenvectors[self._identify[1], :]
 
     def __str__(self):
         return f"VEM-{self.domain}-{self.resolution[0]}x{self.resolution[1]}"

@@ -78,8 +78,8 @@ def main():
 
     plot.complex(cplot_ax, model.vertices, model.triangles, u)
     plot.add_wireframe(rplot_ax, model.vertices, model.polygons, u)
-    matrix_axs[0].matshow(model.L)
-    matrix_axs[1].matshow(model.M)
+    #matrix_axs[0].matshow(model.L)
+    #matrix_axs[1].matshow(model.M)
     solution_figCanvasAgg.draw()
     matrix_figCanvasAgg.draw()
 
@@ -167,7 +167,7 @@ def main():
             if solve == "poisson":
                 u = model.solve_poisson(lambda z: eval(values["inp_f"], {"z": z, "np": np, "z0": model.fd_center()}))
             elif solve == "spectrum":
-                u = model.eigenvectors[eigen_i, :]
+                u = model.eigenvectors[:, eigen_i]
 
             if isPlotComplex:
                 cplot_ax.clear()
@@ -189,8 +189,8 @@ def main():
                 if event == "btn_save":
                     plot.save(rplot_fig, str(model))
 
-            matrix_axs[0].matshow(model.L)
-            matrix_axs[1].matshow(model.M)
+            #matrix_axs[0].matshow(model.L)
+            #matrix_axs[1].matshow(model.M)
             matrix_figCanvasAgg.draw()
 
             solution_figCanvasAgg.draw()
