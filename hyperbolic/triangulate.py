@@ -12,9 +12,35 @@ q = 7
 
 r = radius(p, q)
 
-angle = np.linspace(0, 2 * np.pi * (1 - 1 / p), p)
-X = r * np.cos(angle)
-Y = r * np.sin(angle)
+angle = 2 * np.pi / p
+
+X = [r * np.cos((k + 0.5) * angle) for k in range(p)]
+Y = [r * np.sin((k + 0.5) * angle) for k in range(p)]
+
+s0 = 0.5 * (r + 1 / r) / np.cos(0.5 * angle)
+r_i = s0 * s0 - 1
+
+for _ in range(3):
+    N = np.size(X)
+    for k in range(p):
+        o_i = np.array([s0 * np.cos(k * angle), s0 * np.sin(k * angle)])
+        for i in range(N):
+            u = np.array([X[i] - o_i[0], Y[i] - o_i[1]])
+            s = r_i / (u[0] * u[0] + u[1] * u[1])
+
+            X.append(o_i[0] + s * u[0])
+            Y.append(o_i[1] + s * u[1])
+
+
+def pdisk_to_bkdisk(x, y):
+    for i in range(len(x)):
+        s = 0.5 * (1 + x[i] * x[i] + y[i] * y[i])
+        x[i] /= s
+        y[i] /= s
+
+    return x, y
+
+#X, Y = pdisk_to_bkdisk(X, Y)
 
 plt.scatter(X, Y)
 plt.axis("equal")
