@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import plot
 
 def radius(p, q):
     a = np.tan(np.pi * (0.5 - 1.0 / q))
@@ -7,8 +8,8 @@ def radius(p, q):
     return np.sqrt((a - b) / (a + b))
 
 # must satisfy (p - 2) * (q - 2) > 4
-p = 3
-q = 7
+p = 5
+q = 5
 
 r = radius(p, q)
 
@@ -16,32 +17,49 @@ angle = 2 * np.pi / p
 
 X = [r * np.cos((k + 0.5) * angle) for k in range(p)]
 Y = [r * np.sin((k + 0.5) * angle) for k in range(p)]
+triangles = [[i for i in range(p)]]
+flags = [[False for i in range(p)]]
 
-s0 = 0.5 * (r + 1 / r) / np.cos(0.5 * angle)
-r_i = s0 * s0 - 1
+l0 = 0.5 / np.cos(0.5 * angle) * (r + 1 / r)
+r0 = l0 * l0 - 1
 
-for _ in range(3):
-    N = np.size(X)
+for _ in range(5):
+    N = len(triangles)
+    c = 0
+
     for k in range(p):
-        o_i = np.array([s0 * np.cos(k * angle), s0 * np.sin(k * angle)])
-        for i in range(N):
-            u = np.array([X[i] - o_i[0], Y[i] - o_i[1]])
-            s = r_i / (u[0] * u[0] + u[1] * u[1])
+        m1 = l0 * np.cos(k * angle)
+        m2 = l0 * np.sin(k * angle)
 
-            X.append(o_i[0] + s * u[0])
-            Y.append(o_i[1] + s * u[1])
+        for i in range(0, N):
+            if flags[i][k]:
+                continue
 
+            poly = []
+            for j in range(p):
+                u1 = X[triangles[i][j]] - m1
+                u2 = Y[triangles[i][j]] - m2
+                s = r0 / (u1 * u1 + u2 * u2)
+
+                X.append(m1 + s * u1)
+                Y.append(m2 + s * u2)
+                poly.append(3 * N + c + j)
+
+            triangles.append(poly)
+            flags.append([_i == k for _i in range(p)])
+            flags[i][k] = True
+            c += p
 
 def pdisk_to_bkdisk(x, y):
-    for i in range(len(x)):
-        s = 0.5 * (1 + x[i] * x[i] + y[i] * y[i])
-        x[i] /= s
-        y[i] /= s
+    s = 0.5 * (1 + x * x + y * y)
+    return x / s, y / s
 
-    return x, y
+X, Y = pdisk_to_bkdisk(np.array(X), np.array(Y))
 
-#X, Y = pdisk_to_bkdisk(X, Y)
+print(len(triangles))
 
-plt.scatter(X, Y)
+ax = plt.figure().add_subplot()
+plot.add_wireframe(ax, X, Y, triangles)
+plt.scatter(X, Y, s=5)
 plt.axis("equal")
 plt.show()
