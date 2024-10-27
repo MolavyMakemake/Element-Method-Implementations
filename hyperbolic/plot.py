@@ -41,18 +41,18 @@ def surface(ax, vertices, triangles, u):
     #ax.set_aspect("equal")
 
 
-def add_wireframe(ax, X, Y, polygons, u=None):
+def add_wireframe(ax, vertices, polygons, u=None):
     lines = []
     if u is None:
         for p_i in polygons:
-            p = np.array([np.take(X, p_i + [p_i[0]]), np.take(Y, p_i + [p_i[0]])]).T
+            p = np.array([np.take(vertices[0, :], p_i + [p_i[0]]), np.take(vertices[1, :], p_i + [p_i[0]])]).T
             lines.append(p)
 
         ax.add_collection(LineCollection(lines, linewidths=0.2, edgecolors="black"))
 
     else:
         for p_i in polygons:
-            p = np.array([np.take(X, p_i + [p_i[0]]), np.take(Y, p_i + [p_i[0]]), np.take(u, p_i + [p_i[0]])]).T
+            p = np.array([np.take(vertices[0, :], p_i + [p_i[0]]), np.take(vertices[1, :], p_i + [p_i[0]]), np.take(u, p_i + [p_i[0]])]).T
             lines.append(p)
 
         ax.add_collection(Line3DCollection(lines, linewidths=0.5, edgecolors="black"))

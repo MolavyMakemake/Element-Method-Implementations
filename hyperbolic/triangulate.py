@@ -2,64 +2,89 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plot
 
-def radius(p, q):
+def _pdisk_to_bkdisk(x):
+    s = 0.5 * (1 + x[0, :] * x[0, :] + x[1, :] * x[1, :])
+    return x / s
+
+def _radius(p, q):
     a = np.tan(np.pi * (0.5 - 1.0 / q))
     b = np.tan(np.pi / p)
     return np.sqrt((a - b) / (a + b))
 
 # must satisfy (p - 2) * (q - 2) > 4
-p = 5
-q = 5
+def generate(p, q, iterations, model="Poincare"):
+    r = _radius(p, q)
 
-r = radius(p, q)
+    angle = 2 * np.pi / p
 
-angle = 2 * np.pi / p
+    X = [np.array([r * np.cos((k + 0.5) * angle), r * np.sin((k + 0.5) * angle)]) for k in range(p)]
+    polygons = [set([i for i in range(p)])]
+    flags = [[False for i in range(p)]]
 
-X = [r * np.cos((k + 0.5) * angle) for k in range(p)]
-Y = [r * np.sin((k + 0.5) * angle) for k in range(p)]
-triangles = [[i for i in range(p)]]
-flags = [[False for i in range(p)]]
+    l0 = 0.5 / np.cos(0.5 * angle) * (r + 1 / r)
+    r0 = l0 * l0 - 1
 
-l0 = 0.5 / np.cos(0.5 * angle) * (r + 1 / r)
-r0 = l0 * l0 - 1
+    def _invert(x, m, r):
+        u = x - m
+        return m + (r / (u @ u)) * u
 
-for _ in range(5):
-    N = len(triangles)
-    c = 0
+    for _ in range(iterations):
+        N = len(polygons)
 
-    for k in range(p):
-        m1 = l0 * np.cos(k * angle)
-        m2 = l0 * np.sin(k * angle)
+        for k in range(p): # iterate over every angle
+            m = np.array([l0 * np.cos(k * angle), l0 * np.sin(k * angle)])
 
-        for i in range(0, N):
-            if flags[i][k]:
-                continue
+            for i in range(0, N):
+                if flags[i][k]:
+                    continue
 
-            poly = []
-            for j in range(p):
-                u1 = X[triangles[i][j]] - m1
-                u2 = Y[triangles[i][j]] - m2
-                s = r0 / (u1 * u1 + u2 * u2)
+                poly = set()
+                for v_i in polygons[i]:
+                    x_inv = _invert(X[v_i], m, r0)
 
-                X.append(m1 + s * u1)
-                Y.append(m2 + s * u2)
-                poly.append(3 * N + c + j)
+                    for l in range(len(X)):
+                        if ((x_inv - X[l]) @ (x_inv - X[l]) < 1e-10):
+                            poly.add(l)
+                            break
 
-            triangles.append(poly)
-            flags.append([_i == k for _i in range(p)])
-            flags[i][k] = True
-            c += p
+                    else:
+                        poly.add(len(X))
+                        X.append(x_inv)
 
-def pdisk_to_bkdisk(x, y):
-    s = 0.5 * (1 + x * x + y * y)
-    return x / s, y / s
+                for _poly in polygons:
+                    if _poly == poly:
+                        break
+                else:
+                    polygons.append(poly)
+                    flags.append([_i == k for _i in range(p)])
 
-X, Y = pdisk_to_bkdisk(np.array(X), np.array(Y))
+                flags[i][k] = True
 
-print(len(triangles))
+    X = np.array(X).T
 
-ax = plt.figure().add_subplot()
-plot.add_wireframe(ax, X, Y, triangles)
-plt.scatter(X, Y, s=5)
-plt.axis("equal")
-plt.show()
+    pre_trace = np.zeros(shape=(np.size(X, axis=1)),dtype=int)
+    for i in range(len(polygons)):
+        polygons[i] = list(polygons[i])
+        pre_trace[polygons[i]] += 1
+
+    if np.any(pre_trace > q):
+        print("Overlapping triangulation!")
+
+    print(np.arange(len(pre_trace))[pre_trace > q])
+
+    trace = np.arange(np.size(X, axis=1))[pre_trace < q]
+
+    if model == "Klein":
+        return _pdisk_to_bkdisk(X), polygons, trace
+
+    else:
+        return X, polygons, trace
+
+if __name__ == "__main__":
+    vertices, polygons, trace = generate(3, 7, iterations=4, model="Klein")
+
+    ax = plt.figure().add_subplot()
+    plot.add_wireframe(ax, vertices, polygons)
+    plt.scatter(vertices[0, trace], vertices[1, trace], s=3)
+    plt.axis("equal")
+    plt.show()
