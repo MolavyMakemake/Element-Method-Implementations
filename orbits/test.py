@@ -1,47 +1,34 @@
 import numpy as np
 import matplotlib.pyplot as plt
+res = 100
 
+vertices = np.zeros([2, res * (res + 1) // 2])
 
-def d(x, y):
-    u = y - x
+y = np.repeat(range(res), range(res, 0, -1))
+x = np.arange(res * (res + 1) // 2) - res * y + ((y - 1) * y) // 2
 
-    s = 1 / (u @ u)
-    b = s * (x @ u)
-    c = s * (1 - x @ x)
+vertices[0, :] = x / (res - 1)
+vertices[1, :] = y / (res - 1)
 
-    d = np.sqrt(b*b + c)
-    t1 = -b + d
-    t2 = -b - d
+integral_weight = np.zeros(dtype=float, shape=(np.size(vertices, axis=1)))
 
-    # magic
-    return .5 * np.log(t1 * (t2 - 1) / (t2 * (t1 - 1)))
+i = 0
+while i < res * (res + 1) // 2 - 1:
+    W = int(res - y[i])
 
-n = 5
-res = 3
-edge = np.sqrt(1 / n) * .9
+    if x[i] >= W - 2:
+        integral_weight[[i, i + 1, i + W]] += 1
+        i += 2
+    else:
+        integral_weight[[i, i + 1, i + W]] += 1
+        integral_weight[[i + 1, i + 1 + W, i + W]] += 1
+        i += 1
 
-t = np.linspace(-edge, edge, res)
+h = 1 / (res - 1)
+print("h=", h)
 
+integral_weight *= h * h / 6.0
+print(np.sum(vertices[0, :] * integral_weight, axis=0))
 
-c1 = .5
-c2 = np.sqrt(1 - c1 * c1)
-def T(x):
-    off = np.zeros_like(x)
-    off[0] = (x[0] + c1) / c2 - x[0]
-    return c2 / (1 + c1 * x[0]) * (x + off)
-
-M = 0
-RES = res ** np.arange(0, n)
-for _i in range(res ** n):
-    i = (_i // RES) % res
-    for _j in range(_i + 1, res **n):
-        j = (_j // RES) % res
-
-        x1 = t[i]
-        x2 = t[j]
-        d1 = d(x1, x2)
-        d2 = d(T(x1), T(x2))
-
-        M = np.max(np.abs(d1 - d2), 0)
-
-print(M)
+#plt.scatter(vertices[0, :], vertices[1, :])
+plt.show()

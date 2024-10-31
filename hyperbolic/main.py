@@ -1,15 +1,38 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import plot, FEM, triangulate
+import plot, FEM_BKDISK, FEM_PDISK, triangulate
 
-vertices, polygons, trace = triangulate.generate(p=3, q=7, iterations=5, model="Klein")
-model = FEM.Model(vertices, polygons, trace)
+model_bk = FEM_BKDISK.Model(
+    *triangulate.generate(p=3, q=7, iterations=3, subdivisions=3, model="Klein")
+)
+model_p = FEM_PDISK.Model(
+    *triangulate.generate(p=3, q=7, iterations=3, subdivisions=3, model="Poincare")
+)
 
-f = lambda z: z * np.conj(z)
-u = np.real(model.solve_poisson(f))
+print(model_bk.area())
+print(model_p.area())
 
-ax = plt.figure().add_subplot(projection="3d")
-plot.surface(ax, model.vertices, model.triangles, u)
-plot.add_wireframe(ax, model.vertices, model.triangles, u)
-ax.scatter(vertices[0, trace], vertices[1, trace], u[trace])
+norm_bk = np.max(np.sum(model_bk.vertices * model_bk.vertices, axis=0))
+norm_p = np.max(np.sum(model_p.vertices * model_p.vertices, axis=0))
+
+#f_bk = lambda z: np.atanh(np.abs(z)) < .5
+#f_p = lambda z: 2 * np.atanh(np.abs(z)) < .5
+f_bk = lambda z: 1
+f_p = lambda z: 1
+
+u_bk = np.real(model_bk.solve_poisson(f_bk))
+u_p = np.real(model_p.solve_poisson(f_p))
+
+fig = plt.figure(figsize=plt.figaspect(0.5))
+
+#model_bk.vertices = triangulate._bkdisk_to_pdisk(model_bk.vertices)
+ax = fig.add_subplot(1, 2, 1, projection="3d")
+plot.surface(ax, model_bk.vertices, model_bk.triangles, u_bk, label="Klein")
+plot.add_wireframe(ax, model_bk.vertices, model_bk.triangles, u_bk)
+plt.legend()
+
+ax = fig.add_subplot(1, 2, 2, projection="3d")
+plot.surface(ax, model_p.vertices, model_p.triangles, u_p, label="Poincare")
+plot.add_wireframe(ax, model_p.vertices, model_p.triangles, u_p)
+plt.legend()
 plt.show()
