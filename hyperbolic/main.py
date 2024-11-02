@@ -2,12 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plot, FEM_BKDISK, FEM_PDISK, triangulate
 
-model_bk = FEM_BKDISK.Model(
-    *triangulate.generate(p=3, q=7, iterations=3, subdivisions=3, model="Klein")
-)
-model_p = FEM_PDISK.Model(
-    *triangulate.generate(p=3, q=7, iterations=3, subdivisions=3, model="Poincare")
-)
+vertices_p, triangles, boundary = triangulate.generate(p=3, q=7, iterations=3, subdivisions=2, model="Poincare")
+vertices_bk = triangulate._pdisk_to_bkdisk(vertices_p)
+
+model_p = FEM_PDISK.Model(vertices_p, triangles, boundary)
+model_bk = FEM_BKDISK.Model(vertices_bk, triangles, boundary)
 
 print(model_bk.area())
 print(model_p.area())
@@ -15,8 +14,6 @@ print(model_p.area())
 norm_bk = np.max(np.sum(model_bk.vertices * model_bk.vertices, axis=0))
 norm_p = np.max(np.sum(model_p.vertices * model_p.vertices, axis=0))
 
-#f_bk = lambda z: np.atanh(np.abs(z)) < .5
-#f_p = lambda z: 2 * np.atanh(np.abs(z)) < .5
 f_bk = lambda z: 1
 f_p = lambda z: 1
 
@@ -29,10 +26,10 @@ fig = plt.figure(figsize=plt.figaspect(0.5))
 ax = fig.add_subplot(1, 2, 1, projection="3d")
 plot.surface(ax, model_bk.vertices, model_bk.triangles, u_bk, label="Klein")
 plot.add_wireframe(ax, model_bk.vertices, model_bk.triangles, u_bk)
-plt.legend()
+#plt.legend()
 
 ax = fig.add_subplot(1, 2, 2, projection="3d")
 plot.surface(ax, model_p.vertices, model_p.triangles, u_p, label="Poincare")
 plot.add_wireframe(ax, model_p.vertices, model_p.triangles, u_p)
-plt.legend()
+#plt.legend()
 plt.show()

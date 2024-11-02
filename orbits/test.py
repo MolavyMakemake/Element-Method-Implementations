@@ -28,7 +28,7 @@ h = 1 / (res - 1)
 print("h=", h)
 
 integral_weight *= h * h / 6.0
-print(np.sum(vertices[0, :] * integral_weight, axis=0))
+print(np.sum(1 * integral_weight, axis=0))
 
 #plt.scatter(vertices[0, :], vertices[1, :])
 plt.show()

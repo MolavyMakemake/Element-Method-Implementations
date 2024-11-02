@@ -5,7 +5,7 @@ from Integrator import Integrator
 from hyperbolic import triangulate, plot
 
 def _dVol(x, y):
-    return np.pow(.5 * (1 - x * x - y * y), -2)
+    return np.power(.5 * (1 - x * x - y * y), -2)
 
 class Model:
     def __init__(self, vertices, triangles, trace
