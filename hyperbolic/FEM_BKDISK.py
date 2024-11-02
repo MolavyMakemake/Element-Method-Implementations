@@ -72,6 +72,8 @@ class Model:
 
         L = np.zeros([n, n])
 
+        _dDVol = lambda x, y: np.power(1 - x * x - y * y, -.5)
+
         for v_i, v_j, v_k in self.polygons:
             v1 = self.vertices[:, v_k] - self.vertices[:, v_j]
             v2 = self.vertices[:, v_i] - self.vertices[:, v_k]
@@ -85,10 +87,10 @@ class Model:
             D13 = -v3[1]; D23 = v3[0]
 
             Jac_A = np.abs(-v3[0] * v2[1] + v3[1] * v2[0])
-            I_0 = self._integrator.integrate(lambda x, y: _dVol(F1(x, y), F2(x, y))) / Jac_A
-            I11 = self._integrator.integrate(lambda x, y: F1(x, y) * F1(x, y) * _dVol(F1(x, y), F2(x, y))) / Jac_A
-            I12 = self._integrator.integrate(lambda x, y: F1(x, y) * F2(x, y) * _dVol(F1(x, y), F2(x, y))) / Jac_A
-            I22 = self._integrator.integrate(lambda x, y: F2(x, y) * F2(x, y) * _dVol(F1(x, y), F2(x, y))) / Jac_A
+            I_0 = self._integrator.integrate(lambda x, y: _dDVol(F1(x, y), F2(x, y))) / Jac_A
+            I11 = self._integrator.integrate(lambda x, y: F1(x, y) * F1(x, y) * _dDVol(F1(x, y), F2(x, y))) / Jac_A
+            I12 = self._integrator.integrate(lambda x, y: F1(x, y) * F2(x, y) * _dDVol(F1(x, y), F2(x, y))) / Jac_A
+            I22 = self._integrator.integrate(lambda x, y: F2(x, y) * F2(x, y) * _dDVol(F1(x, y), F2(x, y))) / Jac_A
 
             i, j, k = self._elements[v_i], self._elements[v_j], self._elements[v_k]
 

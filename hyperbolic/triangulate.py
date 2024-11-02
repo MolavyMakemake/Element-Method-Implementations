@@ -11,7 +11,27 @@ def _bkdisk_to_pdisk(x):
     return x / s
 
 def _midpoint_bkdisk(x, y):
-    return .5 * (x + y) # not right
+    return .5 * (x + y)
+
+    _a = (x - y) @ (x - y)
+    _b = x @ x - x @ y
+    _c = 1 - x @ x
+
+    _d = np.sqrt(_b * _b + _a * _c)
+    t0 = (_b + _d) / _a
+    t1 = (_b - _d) / _a
+
+    A = x + t0 * (y - x)
+    B = x + t1 * (y - x)
+
+    Ax = np.sqrt((x - A) @ (x - A))
+    Ay = np.sqrt((y - A) @ (y - A))
+    AB = np.sqrt((B - A) @ (B - A))
+
+    ab = np.sqrt(Ax * Ay)
+    t = ab / (np.sqrt((AB - Ax) * (AB - Ay)) + ab)
+
+    return A + t * (B - A)
 
 def _midpoint_pdisk(x, y):
     x_m = _midpoint_bkdisk(
@@ -94,6 +114,8 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False):
     Q = [q for _ in range(p)]
 
     polygons = [[i for i in range(p)]]
+
+    print("Subdividing...")
     for _ in range(subdivisions):
         polygons = subdivide_triangles(polygons, X)
 
@@ -108,10 +130,12 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False):
         u = x - m
         return m + (r / (u @ u)) * u
 
+    print("Building triangulation...")
     polygons = [set(p_i) for p_i in polygons]
     for _ in range(iterations):
         N = len(polygons)
 
+        print("Iteration:", _)
         for k in range(p): # iterate over every angle
             m = np.array([l0 * np.cos(k * angle), l0 * np.sin(k * angle)])
 
@@ -142,21 +166,28 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False):
 
                 flags[i][k] = True
 
-    pre_trace = np.zeros(shape=(len(X)),dtype=int)
+    pre_trace = np.zeros(shape=(len(X)), dtype=int)
     for i in range(len(polygons)):
         polygons[i] = list(polygons[i])
         pre_trace[polygons[i]] += 1
 
-    trace = np.arange(len(X))[pre_trace < Q]
-
-    if minimal:
-        #for i in range(len(polygons)):
-            #if np.all(pre_trace[polygons[i]])
-        pass
-
+    trace_mask = pre_trace < Q
     if np.any(pre_trace > q):
         print("Overlapping triangulation!")
 
+    if minimal:
+        print("Removing unnecessary triangles...")
+        # remove triangles where all vertices touch the boundary
+        polygons_mask = np.logical_not(np.all(trace_mask[polygons], axis=1))
+        polygons = [polygons[i] for i in range(len(polygons)) if polygons_mask[i]]
+
+        vertices_mask = np.zeros(shape=(len(X)), dtype=bool)
+        for p_i in polygons:
+            vertices_mask[p_i] = True
+
+        trace_mask = np.logical_and(trace_mask, vertices_mask)
+
+    trace = np.arange(len(X))[trace_mask]
     X = np.array(X).T
 
     if model == "Klein":
@@ -166,7 +197,7 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False):
         return X, polygons, trace
 
 if __name__ == "__main__":
-    vertices, polygons, trace = generate(3, 7, iterations=5, subdivisions=2, model="Poincare")
+    vertices, polygons, trace = generate(3, 8, iterations=4, subdivisions=3, model="Poincare", minimal=True)
 
     ax = plt.figure().add_subplot()
     plot.add_wireframe(ax, vertices, polygons)

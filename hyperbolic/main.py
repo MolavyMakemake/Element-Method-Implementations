@@ -3,10 +3,10 @@ import matplotlib.pyplot as plt
 import plot, FEM_BKDISK, FEM_PDISK, triangulate
 
 model_bk = FEM_BKDISK.Model(
-    *triangulate.generate(p=3, q=7, iterations=3, subdivisions=3, model="Klein")
+    *triangulate.generate(p=3, q=7, iterations=3, subdivisions=2, model="Klein", minimal=False)
 )
 model_p = FEM_PDISK.Model(
-    *triangulate.generate(p=3, q=7, iterations=3, subdivisions=3, model="Poincare")
+    *triangulate.generate(p=3, q=8, iterations=3, subdivisions=2, model="Poincare", minimal=False)
 )
 
 print(model_bk.area())
