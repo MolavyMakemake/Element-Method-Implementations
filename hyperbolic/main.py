@@ -1,12 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import plot, FEM_BKDISK, FEM_PDISK, triangulate
+import plot, FEM_BKDISK_O1, FEM_PDISK_O1, FEM_PDISK_O2, triangulate
 
-vertices_p, triangles, boundary = triangulate.generate(p=3, q=7, iterations=3, subdivisions=2, model="Poincare")
+vertices_p, triangles, boundary = triangulate.generate(p=3, q=7, iterations=5, subdivisions=2, model="Poincare", minimal=True)
 vertices_bk = triangulate._pdisk_to_bkdisk(vertices_p)
 
-model_p = FEM_PDISK.Model(vertices_p, triangles, boundary)
-model_bk = FEM_BKDISK.Model(vertices_bk, triangles, boundary)
+model_p = FEM_PDISK_O2.Model(vertices_p, triangles, boundary)
+model_bk = FEM_BKDISK_O1.Model(vertices_bk, triangles, boundary)
 
 print(model_bk.area())
 print(model_p.area())
@@ -22,7 +22,7 @@ u_p = np.real(model_p.solve_poisson(f_p))
 
 fig = plt.figure(figsize=plt.figaspect(0.5))
 
-#model_bk.vertices = triangulate._bkdisk_to_pdisk(model_bk.vertices)
+model_bk.vertices = triangulate._bkdisk_to_pdisk(model_bk.vertices)
 ax = fig.add_subplot(1, 2, 1, projection="3d")
 plot.surface(ax, model_bk.vertices, model_bk.triangles, u_bk, label="Klein")
 plot.add_wireframe(ax, model_bk.vertices, model_bk.triangles, u_bk)

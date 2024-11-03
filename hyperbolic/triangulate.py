@@ -103,6 +103,17 @@ def subdivide_triangles(polygons, vertices):
 
     return _polygons
 
+def trim_vertices(vertices, polygons, boundary, mask):
+    vertices_map = np.cumsum(mask) - 1
+
+    vertices = vertices[:, mask]
+    polygons = [p_i for p_i in polygons if np.all(mask[p_i])]
+    boundary = boundary[mask[boundary]]
+
+    polygons = vertices_map[polygons].tolist()
+    boundary = vertices_map[boundary]
+
+    return vertices, polygons, boundary
 
 # must satisfy (p - 2) * (q - 2) > 4
 def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False):
@@ -135,7 +146,7 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False):
     for _ in range(iterations):
         N = len(polygons)
 
-        print("Iteration:", _)
+        print("Iteration:", _ + 1)
         for k in range(p): # iterate over every angle
             m = np.array([l0 * np.cos(k * angle), l0 * np.sin(k * angle)])
 
@@ -175,20 +186,20 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False):
     if np.any(pre_trace > q):
         print("Overlapping triangulation!")
 
+    X = np.array(X).T
+    trace = np.arange(np.size(X, axis=1))[trace_mask]
+
     if minimal:
         print("Removing unnecessary triangles...")
         # remove triangles where all vertices touch the boundary
         polygons_mask = np.logical_not(np.all(trace_mask[polygons], axis=1))
         polygons = [polygons[i] for i in range(len(polygons)) if polygons_mask[i]]
 
-        vertices_mask = np.zeros(shape=(len(X)), dtype=bool)
+        vertices_mask = np.zeros(shape=(np.size(X, axis=1)), dtype=bool)
         for p_i in polygons:
             vertices_mask[p_i] = True
 
-        trace_mask = np.logical_and(trace_mask, vertices_mask)
-
-    trace = np.arange(len(X))[trace_mask]
-    X = np.array(X).T
+        X, polygons, trace = trim_vertices(X, polygons, trace, vertices_mask)
 
     if model == "Klein":
         return _pdisk_to_bkdisk(X), polygons, trace
@@ -197,7 +208,7 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False):
         return X, polygons, trace
 
 if __name__ == "__main__":
-    vertices, polygons, trace = generate(3, 8, iterations=4, subdivisions=3, model="Poincare", minimal=True)
+    vertices, polygons, trace = generate(3, 7, iterations=1, subdivisions=1, model="Poincare", minimal=True)
 
     ax = plt.figure().add_subplot()
     plot.add_wireframe(ax, vertices, polygons)

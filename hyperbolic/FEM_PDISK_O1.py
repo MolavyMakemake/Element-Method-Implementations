@@ -45,30 +45,24 @@ class Model:
 
     def _bake_domain(self):
         self._identify = [[], []]
-        self._exclude = []
+        self._exclude = np.zeros(shape=np.size(self.vertices, axis=1), dtype=bool)
 
         if self.isTraceFixed:
-            self._exclude.extend(self._trace)
+            self._exclude[self._trace] = True
 
     def _bake_triangles(self):
         self.triangles = self.polygons
 
     def _bake_matrices(self):
-        n = 0
-        elements = []
-        self._mask = []
+        self._mask = np.logical_not(self._exclude)
         self._area = []
 
-        for i in range(np.size(self.vertices, axis=1)):
-            if i in self._exclude:
-                elements.append(-1)
-            else:
-                elements.append(n)
-                self._mask.append(i)
-                n += 1
+        elements = np.cumsum(self._mask) - 1
+        n = elements[-1] + 1
 
-        self._elements = np.array(elements)
+        self._elements = elements
         self._elements[self._identify[0]] = self._elements[self._identify[1]]
+        self._n_elements = n
 
         L = np.zeros([n, n])
 
@@ -82,25 +76,25 @@ class Model:
 
             i, j, k = self._elements[v_i], self._elements[v_j], self._elements[v_k]
 
-            if i >= 0:
+            if self._mask[v_i]:
                 L[i, i] += np.dot(v1, v1) * l
-                if j >= 0:
+                if self._mask[v_j]:
                     L12 = np.dot(v1, v2) * l
                     L[i, j] += L12
                     L[j, i] += L12
-                if k >= 0:
+                if self._mask[v_k]:
                     L13 = np.dot(v1, v3) * l
                     L[i, k] += L13
                     L[k, i] += L13
 
-            if j >= 0:
+            if self._mask[v_j]:
                 L[j, j] += np.dot(v2, v2) * l
-                if k >= 0:
+                if self._mask[v_k]:
                     L23 = np.dot(v2, v3) * l
                     L[j, k] += L23
                     L[k, j] += L23
 
-            if k >= 0:
+            if self._mask[v_k]:
                 L[k, k] += np.dot(v3, v3) * l
 
             #print(L)
@@ -110,7 +104,7 @@ class Model:
     def solve_poisson(self, f):
         u = np.zeros(np.size(self.vertices, axis=1), dtype=complex)
 
-        b = np.zeros(dtype=complex, shape=(len(self._mask)))
+        b = np.zeros(dtype=complex, shape=(self._n_elements))
 
         for v_i, v_j, v_k in self.polygons:
             v1 = self.vertices[:, v_k] - self.vertices[:, v_j]
@@ -125,11 +119,11 @@ class Model:
 
             i, j, k = self._elements[v_i], self._elements[v_j], self._elements[v_k]
 
-            if i >= 0:
+            if self._mask[v_i]:
                 b[i] += Jac_A * self._integrator.integrate(lambda x, y: _f_dv(x, y) * (1 - x - y))
-            if j >= 0:
+            if self._mask[v_j]:
                 b[j] += Jac_A * self._integrator.integrate(lambda x, y: _f_dv(x, y) * x)
-            if k >= 0:
+            if self._mask[v_k]:
                 b[k] += Jac_A * self._integrator.integrate(lambda x, y: _f_dv(x, y) * y)
 
         u[self._mask] = sp.linalg.spsolve(self.L, b)
