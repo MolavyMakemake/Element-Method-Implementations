@@ -1,3 +1,4 @@
 import numpy as np
 
-print(np.cumsum([False, False, True, True]) - 1)
+A = np.array([[1, 2], [3, 0]])
+print(A[1, 0])
