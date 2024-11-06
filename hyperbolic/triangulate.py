@@ -1,6 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import plot
+from tempfile import TemporaryFile
+import Integrator
+
+def save(vertices, polygons, boundary, filename):
+    np.savez(filename, vertices=vertices, polygons=polygons, boundary=boundary)
+
+def load(filename):
+    v = None; p = None; b = None
+    with np.load(filename) as data:
+        v = data["vertices"]
+        p = data["polygons"]
+        b = data["boundary"]
+
+    return v, [list(p_i) for p_i in p], b
 
 def _pdisk_to_bkdisk(x):
     s = 0.5 * (1 + x[0, :] * x[0, :] + x[1, :] * x[1, :])
@@ -11,8 +25,6 @@ def _bkdisk_to_pdisk(x):
     return x / s
 
 def _midpoint_bkdisk(x, y):
-    return .5 * (x + y)
-
     _a = (x - y) @ (x - y)
     _b = x @ x - x @ y
     _c = 1 - x @ x
@@ -104,16 +116,20 @@ def subdivide_triangles(polygons, vertices):
     return _polygons
 
 def trim_vertices(vertices, polygons, boundary, mask):
+    boundary = np.array(boundary)
     vertices_map = np.cumsum(mask) - 1
+    _boundary = set(vertices_map[boundary[mask[boundary]]])
+
+    for i in range(len(polygons)):
+        p_i = polygons[i]
+        if not np.all(mask[p_i]):
+            _boundary.update(vertices_map[[j for j in p_i if mask[j]]])
 
     vertices = vertices[:, mask]
     polygons = [p_i for p_i in polygons if np.all(mask[p_i])]
-    boundary = boundary[mask[boundary]]
-
     polygons = vertices_map[polygons].tolist()
-    boundary = vertices_map[boundary]
 
-    return vertices, polygons, boundary
+    return vertices, polygons, list(_boundary)
 
 # must satisfy (p - 2) * (q - 2) > 4
 def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False):
@@ -202,16 +218,158 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False):
         X, polygons, trace = trim_vertices(X, polygons, trace, vertices_mask)
 
     if model == "Klein":
-        return _pdisk_to_bkdisk(X), polygons, trace
+        return _pdisk_to_bkdisk(X), polygons, trace.tolist()
 
     else:
-        return X, polygons, trace
+        return X, polygons, trace.tolist()
+
+def force_disk(vertices, polygons, trace, r, s, debug=False):
+    R = np.tanh(.5 * r)
+    R_l = np.tanh(.5 * (r - s))
+    R_u = np.tanh(.5 * (r + s))
+
+    if debug:
+        t = np.linspace(0, 2 * np.pi)
+        plt.plot(R * np.cos(t), R * np.sin(t), linewidth=0.5, color="black")
+        plt.plot(R_u * np.cos(t), R_u * np.sin(t), linewidth=0.5, color="gray")
+        plt.plot(R_l * np.cos(t), R_l * np.sin(t), linewidth=0.5, color="gray")
+
+    else:
+        vertices, polygons, trace = trim_vertices(vertices, polygons, trace,
+                              np.sum(vertices * vertices, axis=0) < R_u * R_u)
+
+        vert_norm = np.sqrt(np.sum(vertices * vertices, axis=0))
+        shift_mask = vert_norm > R_l
+        vertices[:, shift_mask] *= R / vert_norm[shift_mask]
+
+        trace_mask = np.zeros(shape=np.size(vertices, axis=1), dtype=bool)
+        trace_mask[trace] = True
+
+        polygons_boundary = [p_i for p_i in polygons if np.any(trace_mask)]
+        trace_nbh = [set() for _ in range(np.size(vertices, axis=1))]
+        for I in range(len(polygons_boundary)):
+            p_i = polygons_boundary[I]
+            shifted = [i for i in p_i if shift_mask[i]]
+            if len(shifted) == 0:
+                continue
+
+            for i in p_i:
+                if shift_mask[i]:
+                    continue
+
+                d = 1e10
+                edge_i = None
+                for j in shifted:
+                    trace_nbh[i].discard(j)
+                    _d = (vertices[:, i] - vertices[:, j]) @ (vertices[:, i] - vertices[:, j])
+                    if _d < d:
+                        edge_i = j
+                        d = _d
+
+                if not -edge_i - 1 in trace_nbh[i]:
+                    trace_nbh[i].add(edge_i)
+
+                trace_nbh[i].update([-j - 1 for j in shifted])
+
+        for i in range(len(trace_nbh)):
+            if not trace_mask[i]:
+                continue
+
+            p_i = [j for j in trace_nbh[i] if j > 0]
+            if len(p_i) >= 2:
+                plt.scatter(vertices[0, i], vertices[1, i])
+                print(trace_nbh[i])
+                trace.remove(i)
+                polygons.append([i, p_i[0], p_i[1]])
+
+    return vertices, polygons, trace
+
+def connect_inactives(vertices, polygons, trace):
+    trace_mask = np.zeros(shape=np.size(vertices, axis=1), dtype=bool)
+    trace_mask[trace] = True
+
+    polygons_boundary = [p_i for p_i in polygons if np.any(trace_mask[p_i])]
+    polygons_inactive = [p_i for p_i in polygons_boundary if np.all(trace_mask[p_i])]
+    p_nbh = [[None, None, None] for _ in polygons_inactive]
+
+    for I in range(len(polygons_inactive)):
+        p_i = polygons_inactive[I]
+        for J in range(len(polygons_boundary)):
+            p_j = polygons_boundary[J]
+            if p_i == p_j:
+                continue
+
+            _J = -1
+            if p_j in polygons_inactive:
+                _J = polygons_inactive.index(p_j)
+
+            if p_i[0] in p_j:
+                p_nbh[I][0] = _J
+            if p_i[1] in p_j:
+                p_nbh[I][1] = _J
+            if p_i[2] in p_j:
+                p_nbh[I][2] = _J
+
+    for I in range(len(polygons_inactive)):
+        p_i = polygons_inactive[I]
+
+        print(p_nbh[I])
+        edge_i = p_nbh[I].index(None)
+        i1 = (edge_i + 1) % 3
+        i2 = (edge_i + 2) % 3
+
+        J = p_nbh[I][i1]
+        K = p_nbh[I][i2]
+
+        if I < J:
+            p_j = polygons_inactive[J]
+            edge_j = p_nbh[J].index(None)
+            polygons.append([p_i[edge_i], p_j[edge_j], p_i[i1]])
+            trace.remove(p_i[i1])
+
+        if I < K:
+            p_k = polygons_inactive[K]
+            edge_k = p_nbh[K].index(None)
+            polygons.append([p_i[edge_i], p_k[edge_k], p_i[i2]])
+            trace.remove(p_i[i2])
+
+    return vertices, polygons, trace
+
+def _check_area(vertices, polygons):
+    integrator = Integrator.Integrator(100)
+
+    _min = 1e10
+    _max = 0
+    _avg = 0
+    _dVol = lambda x, y: np.power(.5 * (1 - x*x - y*y), -2)
+    for p_i in polygons:
+        p0 = vertices[:, p_i[0]]
+        u = vertices[:, p_i[1]] - p0
+        v = vertices[:, p_i[2]] - p0
+
+        F1 = lambda x, y: p0[0] + x * u[0] + y * v[0]
+        F2 = lambda x, y: p0[1] + x * u[1] + y * v[1]
+
+        area = np.abs(u[0] * v[1] - u[1] * v[0]) * \
+               integrator.integrate(lambda x, y: _dVol(F1(x, y), F2(x, y)))
+
+        _min = min(area, _min)
+        _max = max(area, _max)
+        _avg += area
+
+    print("min:", _min, "; max:", _max, "; avg:", _avg / len(polygons))
 
 if __name__ == "__main__":
-    vertices, polygons, trace = generate(3, 7, iterations=1, subdivisions=1, model="Poincare", minimal=True)
-
     ax = plt.figure().add_subplot()
+    vertices, polygons, trace = generate(3, 7, iterations=6, subdivisions=1, model="Poincare", minimal=False)
+    vertices, polygons, trace = force_disk(vertices, polygons, trace, 2.4, 0.2, False)
+    #vertices, polygons, trace = connect_inactives(vertices, polygons, trace)
+
+    _check_area(vertices, polygons)
     plot.add_wireframe(ax, vertices, polygons)
     plt.scatter(vertices[0, trace], vertices[1, trace], s=3)
+
+    #save(vertices, polygons, trace, "3761__poincare__disk24")
+
     plt.axis("equal")
     plt.show()

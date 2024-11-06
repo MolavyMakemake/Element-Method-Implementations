@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plot, FEM_PDISK_O1, FEM_PDISK_O2, FEM_BKDISK_O1, FEM_BKDISK_O2, triangulate
 
-vertices_p, triangles, boundary = triangulate.generate(p=3, q=7, iterations=5, subdivisions=2, model="Poincare", minimal=True)
+vertices_p, triangles, boundary = triangulate.load("disk_3760_p.npz")
 vertices_bk = triangulate._pdisk_to_bkdisk(vertices_p)
 
 models = (
@@ -31,6 +31,5 @@ for i in range(len(models)):
     ax = fig.add_subplot(2, 2, i+1, projection="3d")
     plot.surface(ax, models[i].vertices, models[i].triangles, u, label=labels[i])
     plot.add_wireframe(ax, models[i].vertices, models[i].triangles, u)
-    plt.legend()
 
 plt.show()
