@@ -175,30 +175,38 @@ class Model:
         return np.average(self.vertices[0, self._mask] + 1j * self.vertices[1, self._mask])
 
     def compare(self, u, norm):
+        _dV = None
         if norm == "L2":
-            A = 0
-            B = 0
-            for p_i in self.polygons:
-                p0 = self.vertices[:, p_i[0]]
-                v1 = self.vertices[:, p_i[1]] - p0
-                v2 = self.vertices[:, p_i[2]] - p0
+            _dV = lambda x, y: 1
+        elif norm == "L2_g":
+            _dV = _dVol
+        else:
+            print("Does not support norm", norm)
+            return 0
 
-                Jac_A = np.abs(v1[0] * v2[1] - v1[1] * v2[0])
-                F1 = lambda x, y: p0[0] + x * v1[0] + y * v2[0]
-                F2 = lambda x, y: p0[1] + x * v1[1] + y * v2[1]
+        A = 0
+        B = 0
+        for p_i in self.polygons:
+            p0 = self.vertices[:, p_i[0]]
+            v1 = self.vertices[:, p_i[1]] - p0
+            v2 = self.vertices[:, p_i[2]] - p0
 
-                e = self._solution[self._elements[p_i]]
-                e[np.logical_not(self._mask[p_i])] = 0
+            Jac_A = np.abs(v1[0] * v2[1] - v1[1] * v2[0])
+            F1 = lambda x, y: p0[0] + x * v1[0] + y * v2[0]
+            F2 = lambda x, y: p0[1] + x * v1[1] + y * v2[1]
 
-                _u = lambda x, y: u(F1(x, y) + 1j * F2(x, y))
-                w = lambda x, y: _u(x, y) - e[0] * (1 - x - y) - e[1] * x - e[2] * y
+            e = self._solution[self._elements[p_i]]
+            e[np.logical_not(self._mask[p_i])] = 0
 
-                A += Jac_A * self._integrator.integrate(
-                    lambda x, y: w(x, y) * np.conj(w(x, y)) * _dVol(F1(x, y), F2(x, y)))
-                B += Jac_A * self._integrator.integrate(
-                    lambda x, y: _u(x, y) * np.conj(_u(x, y)) * _dVol(F1(x, y), F2(x, y)))
+            _u = lambda x, y: u(F1(x, y) + 1j * F2(x, y))
+            w = lambda x, y: _u(x, y) - e[0] * (1 - x - y) - e[1] * x - e[2] * y
 
-            return np.sqrt(np.real(A) / np.real(B))
+            A += Jac_A * self._integrator.integrate(
+                lambda x, y: w(x, y) * np.conj(w(x, y)) * _dV(F1(x, y), F2(x, y)))
+            B += Jac_A * self._integrator.integrate(
+                lambda x, y: _u(x, y) * np.conj(_u(x, y)) * _dV(F1(x, y), F2(x, y)))
+
+        return np.sqrt(np.real(A) / np.real(B))
 
 
 

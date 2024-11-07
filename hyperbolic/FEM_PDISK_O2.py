@@ -292,37 +292,45 @@ class Model:
         return A
 
     def compare(self, u, norm):
+        _dV = None
         if norm == "L2":
-            A = 0
-            B = 0
-            for I in range(len(self.polygons)):
-                p0 = self.vertices[:, self.polygons[I][0]]
-                v1 = self.vertices[:, self.polygons[I][1]] - p0
-                v2 = self.vertices[:, self.polygons[I][2]] - p0
+            _dV = lambda x, y: 1
+        elif norm == "L2_g":
+            _dV = _dVol
+        else:
+            print("Does not support norm", norm)
+            return 0
 
-                Jac_A = np.abs(v1[0] * v2[1] - v1[1] * v2[0])
-                F1 = lambda x, y: p0[0] + x * v1[0] + y * v2[0]
-                F2 = lambda x, y: p0[1] + x * v1[1] + y * v2[1]
+        A = 0
+        B = 0
+        for I in range(len(self.polygons)):
+            p0 = self.vertices[:, self.polygons[I][0]]
+            v1 = self.vertices[:, self.polygons[I][1]] - p0
+            v2 = self.vertices[:, self.polygons[I][2]] - p0
 
-                e = self._solution[self._elements[I, :]]
-                e[np.logical_not(self._mask[I, :])] = 0
+            Jac_A = np.abs(v1[0] * v2[1] - v1[1] * v2[0])
+            F1 = lambda x, y: p0[0] + x * v1[0] + y * v2[0]
+            F2 = lambda x, y: p0[1] + x * v1[1] + y * v2[1]
 
-                _u = lambda x, y: u(F1(x, y) + 1j * F2(x, y))
-                w = lambda x, y: _u(x, y) \
-                            - e[0] * (1 - 2*x - 2*y) * (1 - x - y) \
-                            - e[1] * x * (2*x - 1) \
-                            - e[2] * y * (2*y - 1) \
-                            - e[3] * 4*x * (1 - x - y) \
-                            - e[4] * 4 * x * y \
-                            - e[5] * 4*y * (1 - x - y)
+            e = self._solution[self._elements[I, :]]
+            e[np.logical_not(self._mask[I, :])] = 0
 
-                A += Jac_A * self._integrator.integrate(
-                    lambda x, y: w(x, y) * np.conj(w(x, y)) * _dVol(F1(x, y), F2(x, y)))
-                B += Jac_A * self._integrator.integrate(
-                    lambda x, y: _u(x, y) * np.conj(_u(x, y)) * _dVol(F1(x, y), F2(x, y)))
+            _u = lambda x, y: u(F1(x, y) + 1j * F2(x, y))
+            w = lambda x, y: _u(x, y) \
+                        - e[0] * (1 - 2*x - 2*y) * (1 - x - y) \
+                        - e[1] * x * (2*x - 1) \
+                        - e[2] * y * (2*y - 1) \
+                        - e[3] * 4*x * (1 - x - y) \
+                        - e[4] * 4 * x * y \
+                        - e[5] * 4*y * (1 - x - y)
+
+            A += Jac_A * self._integrator.integrate(
+                lambda x, y: w(x, y) * np.conj(w(x, y)) * _dV(F1(x, y), F2(x, y)))
+            B += Jac_A * self._integrator.integrate(
+                lambda x, y: _u(x, y) * np.conj(_u(x, y)) * _dV(F1(x, y), F2(x, y)))
 
 
-            return np.sqrt(np.real(A) / np.real(B))
+        return np.sqrt(np.real(A) / np.real(B))
 
 if __name__ == "__main__":
     vertices, polygons, trace = triangulate.generate(p=3, q=7, iterations=3, subdivisions=2, model="Poincare", minimal=True)

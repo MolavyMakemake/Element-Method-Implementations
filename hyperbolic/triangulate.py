@@ -5,7 +5,7 @@ from tempfile import TemporaryFile
 import Integrator
 
 def save(vertices, polygons, boundary, filename):
-    np.savez(filename, vertices=vertices, polygons=polygons, boundary=boundary)
+    np.savez("./triangulations/" + filename, vertices=vertices, polygons=polygons, boundary=boundary)
 
 def load(filename):
     v = None; p = None; b = None
@@ -44,6 +44,25 @@ def _midpoint_bkdisk(x, y):
     t = ab / (np.sqrt((AB - Ax) * (AB - Ay)) + ab)
 
     return A + t * (B - A)
+
+def _midpoint(vertices, triangles, _int, _dVol):
+    x_m = 0
+    y_m = 0
+    A = 0
+    for i0, i1, i2 in triangles:
+        p0 = vertices[i0]
+        v1 = vertices[i1] - p0
+        v2 = vertices[i2] - p0
+
+        Jac_A = np.abs(v1[0] * v2[1] - v1[1] * v2[0])
+        F1 = lambda x, y: p0[0] + v1[0] * x + v2[0] * y
+        F2 = lambda x, y: p0[1] + v1[1] * x + v2[1] * y
+
+        x_m += Jac_A * _int.integrate(lambda x, y: F1(x, y) * _dVol(F1(x, y), F2(x, y)))
+        y_m += Jac_A * _int.integrate(lambda x, y: F2(x, y) * _dVol(F1(x, y), F2(x, y)))
+        A += Jac_A * _int.integrate(lambda x, y: _dVol(F1(x, y), F2(x, y)))
+
+    return np.array([x_m, y_m]) / A
 
 def _midpoint_pdisk(x, y):
     x_m = _midpoint_bkdisk(
@@ -115,6 +134,50 @@ def subdivide_triangles(polygons, vertices):
 
     return _polygons
 
+def subdivide_square(polygons, vertices):
+    _polygons = []
+    n = len(vertices)
+
+    _int = Integrator.Integrator(100)
+    _dVol = lambda x, y: np.power(.5 * (1 - x*x - y*y), -2)
+
+    for p_i in polygons:
+        M = [
+            _midpoint_pdisk(vertices[p_i[0]], vertices[p_i[1]]),
+            _midpoint_pdisk(vertices[p_i[1]], vertices[p_i[2]]),
+            _midpoint_pdisk(vertices[p_i[2]], vertices[p_i[3]]),
+            _midpoint_pdisk(vertices[p_i[3]], vertices[p_i[0]])
+        ]
+
+        I = [-1, -1, -1, -1]
+        for l in range(len(vertices)):
+            for i in range(4):
+                if (M[i] - vertices[l]) @ (M[i] - vertices[l]) < 1e-10:
+                    I[i] = l
+
+        for i in range(4):
+            if I[i] < 0:
+                vertices.append(M[i])
+                I[i] = n
+                n += 1
+
+        c = _midpoint(
+            vertices=[vertices[i] for i in p_i],
+            triangles=[[0, 1, 2], [0, 2, 3]],
+            _int=_int, _dVol=_dVol
+        )
+        _polygons.extend([
+            [p_i[0], I[0], n, I[3]],
+            [p_i[1], I[1], n, I[0]],
+            [p_i[2], I[2], n, I[1]],
+            [p_i[3], I[3], n, I[2]]
+        ])
+
+        vertices.append(c)
+        n += 1
+
+    return _polygons
+
 def trim_vertices(vertices, polygons, boundary, mask):
     boundary = np.array(boundary)
     vertices_map = np.cumsum(mask) - 1
@@ -132,11 +195,16 @@ def trim_vertices(vertices, polygons, boundary, mask):
     return vertices, polygons, list(_boundary)
 
 # must satisfy (p - 2) * (q - 2) > 4
-def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False, radius=1):
-    R2 = radius * radius
+def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False, sieve=lambda x: False):
     r = _radius(p, q)
-
     angle = 2 * np.pi / p
+
+    _sieve = None
+    if model == "Poincare":
+        _sieve = sieve
+
+    if model == "Klein":
+        _sieve = lambda x: sieve(2 * x / (1 + x @ x))
 
     X = [np.array([r * np.cos((k + 0.5) * angle), r * np.sin((k + 0.5) * angle)]) for k in range(p)]
     Q = [q for _ in range(p)]
@@ -144,10 +212,14 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False, ra
     polygons = [[i for i in range(p)]]
 
     print("Subdividing...")
-    for _ in range(subdivisions):
-        polygons = subdivide_triangles(polygons, X)
-
-    Q.extend([6 for _ in range(len(X) - p)])
+    if p == 3:
+        for _ in range(subdivisions):
+            polygons = subdivide_triangles(polygons, X)
+        Q.extend([6 for _ in range(len(X) - p)])
+    elif p == 4:
+        for _ in range(subdivisions):
+            polygons = subdivide_square(polygons, X)
+        Q.extend([4 for _ in range(len(X) - p)])
 
     flags = [[False for i in range(p)] for _ in range(len(polygons))]
 
@@ -159,7 +231,7 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False, ra
         return m + (r / (u @ u)) * u
 
     print("Building triangulation...")
-    polygons = [set(p_i) for p_i in polygons]
+    #polygons = [set(p_i) for p_i in polygons]
     for _ in range(iterations):
         N = len(polygons)
 
@@ -176,23 +248,23 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False, ra
 
                 p_i = list(polygons[i])
                 _inv = [_invert(X[j], m, r0) for j in p_i]
-                if all([x @ x > R2 for x in _inv]):
+                if all([_sieve(x) for x in _inv]):
                     flags[i][k] = True
                     continue
 
-                poly = set()
+                poly = []
                 for j in range(len(p_i)):
                     for l in range(len(X)):
                         if ((_inv[j] - X[l]) @ (_inv[j] - X[l]) < 1e-10):
-                            poly.add(l)
+                            poly.append(l)
                             break
                     else:
-                        poly.add(len(X))
+                        poly.append(len(X))
                         X.append(_inv[j] )
                         Q.append(Q[p_i[j]])
 
                 for _poly in polygons:
-                    if _poly == poly:
+                    if set(_poly) == set(poly):
                         break
                 else:
                     polygons.append(poly)
@@ -204,7 +276,6 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False, ra
 
     pre_trace = np.zeros(shape=(len(X)), dtype=int)
     for i in range(len(polygons)):
-        polygons[i] = list(polygons[i])
         pre_trace[polygons[i]] += 1
 
     trace_mask = pre_trace < Q
@@ -244,15 +315,79 @@ def force_disk(vertices, polygons, trace, r):
 
     return vertices, polygons, trace
 
-def _check_area(vertices, polygons):
+def force_rect(vertices, polygons, trace, r, debug=True):
+    trace_mask = np.zeros(shape=np.size(vertices, axis=1), dtype=bool)
+    trace_mask[trace] = True
+
+    I = 0
+    vertices_mask = np.zeros(shape=np.size(vertices, axis=1), dtype=bool)
+    while I < len(polygons):
+        p_i = polygons[I]
+        sample = [vertices[:, i] for i in p_i]
+        sample.extend([
+            .5 * (sample[0] + sample[1]),
+            .5 * (sample[1] + sample[2]),
+            .5 * (sample[2] + sample[0])
+        ])
+
+        if any([np.max(np.abs(v)) < r for v in sample]):
+            vertices_mask[p_i] = True
+            I += 1
+        else:
+            trace_mask[p_i] = True
+            polygons.pop(I)
+
+    trace = [i for i in range(len(trace_mask)) if trace_mask[i]]
+    vertices, polygons, trace = trim_vertices(vertices, polygons, trace, vertices_mask)
+
+    if debug:
+        plt.plot([-r, r, r, -r, -r], [r, r, -r, -r, r])
+        return vertices, polygons, trace
+
+
+    for i in trace:
+        a, b = np.abs(vertices[:, i])
+        if a > r:
+            vertices[0, i] *= r / a
+            vertices[1, i] *= vertices[1, i] / r
+        if b > r:
+            vertices[1, i] *= r / b
+
+    fixed_points = [
+        np.array([-r,  r]),
+        np.array([ r,  r]),
+        np.array([-r, -r]),
+        np.array([ r, -r])
+    ]
+    fp_d = [1e10 for _ in fixed_points]
+    fp_i = [0 for _ in fixed_points]
+    for i in trace:
+        v = vertices[:, i]
+        for j in range(len(fixed_points)):
+            w = fixed_points[j]
+            _d = (v - w) @ (v - w)
+            if _d < fp_d[j]:
+                fp_d[j] = _d
+                fp_i[j] = i
+
+    for i in range(len(fixed_points)):
+        vertices[:, fp_i[i]] = fixed_points[i]
+
+    return vertices, polygons, trace
+
+def _fix_area(vertices, polygons, trace, threshold = 1e-2):
     print("Checking area...")
     integrator = Integrator.Integrator(100)
+
+    vertices_area = np.zeros(shape=np.size(vertices, axis=1), dtype=float)
 
     _min = 1e10
     _max = 0
     _avg = 0
     _dVol = lambda x, y: np.power(.5 * (1 - x*x - y*y), -2)
-    for p_i in polygons:
+    for I in range(len(polygons)):
+        p_i = polygons[I]
+
         p0 = vertices[:, p_i[0]]
         u = vertices[:, p_i[1]] - p0
         v = vertices[:, p_i[2]] - p0
@@ -263,29 +398,115 @@ def _check_area(vertices, polygons):
         area = np.abs(u[0] * v[1] - u[1] * v[0]) * \
                integrator.integrate(lambda x, y: _dVol(F1(x, y), F2(x, y)))
 
+        vertices_area[p_i] = np.maximum(vertices_area[p_i], area)
+
         _min = min(area, _min)
         _max = max(area, _max)
         _avg += area
 
     print("min:", _min, "; max:", _max, "; avg:", _avg / len(polygons))
 
+    vertices_mask = vertices_area > threshold * _max
+    if np.all(vertices_mask):
+        return vertices, polygons, trace
+    else:
+        return trim_vertices(vertices, polygons, trace, vertices_mask)
+
+def rect(h):
+    N = int(2 / h) + 1
+    vertices = np.zeros([2, N * N])
+
+    X, Y = np.meshgrid(np.linspace(-1, 1, N), np.linspace(-1, 1, N))
+    vertices[0, :] = X.flatten()
+    vertices[1, :] = Y.flatten()
+
+    polygons = []
+    for y_i in range(N - 1):
+        for x_i in range(N - 1):
+            i = N * y_i + x_i
+            polygons.append([i, i + N + 1, i + N])
+            polygons.append([i, i + 1, i + N + 1])
+
+    trace = []
+    trace.extend(range(N))
+    trace.extend(range(N * (N - 1), N * N))
+    trace.extend(range(N, N * (N - 1), N))
+    trace.extend(range(2 * N - 1, N * N - 1, N))
+
+    return vertices, polygons, trace
+
+def plot_triangulation(filename):
+    fig = plt.figure(figsize=plt.figaspect(1.0))
+    ax = fig.add_subplot(xlim=(-1, 1), ylim=(-1, 1))
+    plt.axis("off")
+
+    vertices, polygons, trace = load("./triangulations/" + filename + ".npz")
+    plot.add_wireframe(ax, vertices, polygons)
+
+    extent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+    plt.savefig("./figures/" + filename + ".png", bbox_inches=extent)
+
+def _generate_uniform_rect(R, n_it, n_sd):
+    W = R / np.sqrt(2)
+
+    def _sieve(x):
+        return x @ x > R * R
+
+    vertices, _polygons, trace = generate(4, 5, iterations=n_it, subdivisions=n_sd,
+                                          model="Klein", minimal=False, sieve=_sieve)
+
+    _vert = []
+    n = np.size(vertices, axis=1)
+    polygons = []
+    _int = Integrator.Integrator(100)
+    _dVol = lambda x, y: np.power(1 - x * x - y * y, -1.5)
+    for i0, i1, i2, i3 in _polygons:
+        m0 = _midpoint_bkdisk(vertices[:, i0], vertices[:, i1])
+        m1 = _midpoint_bkdisk(vertices[:, i2], vertices[:, i3])
+
+        c = _midpoint(
+            vertices=[vertices[:, i0], vertices[:, i1],
+                      vertices[:, i2], vertices[:, i3]],
+            triangles=[[0, 1, 2], [0, 2, 3]],
+            _int=_int, _dVol=_dVol
+        )
+        polygons.extend([
+            [i0, i1, n],
+            [i1, i2, n],
+            [i2, i3, n],
+            [i3, i0, n]
+        ])
+
+        _vert.append(c)
+        n += 1
+
+    vertices = np.append(vertices, np.array(_vert).T, axis=1)
+    vertices, polygons, trace = force_rect(vertices, polygons, trace, W, debug=False)
+    #vertices, polygons, trace = _fix_area(vertices, polygons, trace, 1e-10)
+
+    return vertices, polygons, trace
+
 if __name__ == "__main__":
-    R = .95
+    '''
+    plot_triangulation("38_6s0__poincare__r95")
+    plot_triangulation("38_6s1__poincare__r95")
+    plot_triangulation("38_6s2__poincare__r95")
+    plot_triangulation("38_6s3__poincare__r95")
+    '''
 
+    #'''
     ax = plt.figure().add_subplot()
-    vertices, polygons, trace = generate(3, 7, iterations=10, subdivisions=0, model="Poincare", minimal=False, radius=R)
-    print(np.sqrt(np.min(np.sum(vertices[:, trace] * vertices[:, trace], axis=0))))
-    vertices, polygons, trace = force_disk(vertices, polygons, trace, R)
 
-    _check_area(vertices, polygons)
+    vertices, polygons, trace = _generate_uniform_rect(0.994, n_it=4, n_sd=1)
+
     plot.add_wireframe(ax, vertices, polygons)
     plt.scatter(vertices[0, trace], vertices[1, trace], s=3)
 
-    #save(vertices, polygons, trace, "37_10s3__poincare__95")
+    save(vertices, polygons, trace, "45_4s1__poincare__r994")
 
     plt.axis("equal")
     plt.show()
-
+    #'''
 '''
 
 def force_disk(vertices, polygons, trace, r, s, debug=False):

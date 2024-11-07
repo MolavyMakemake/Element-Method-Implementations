@@ -4,6 +4,8 @@ import plot, FEM_BKDISK_O1, FEM_BKDISK_O2, FEM_PDISK_O1, FEM_PDISK_O2, triangula
 
 
 def distance(x, y):
+    return np.sqrt((x - y) @ (x - y))
+
     _d = 2 * (x - y) @ (x - y) / ((1 - x @ x) * (1 - y @ y))
     return np.arccosh(1 + _d)
 
@@ -22,7 +24,7 @@ R = .95
 
 #g0 = lambda t: -np.log(1 - t)
 #c = g0(R * R)
-
+#
 #v = lambda z: c - g0(z * np.conj(z))
 #f = lambda z: 1
 
@@ -38,7 +40,10 @@ F = [f, f, f_k, f_k]
 H = []
 Y = [[] for _ in range(len(F))]
 
-for triangulation_f in ["37_10s0__poincare__95.npz", "37_10s1__poincare__95.npz"]:
+for triangulation_f in ["rect35__poincare__95.npz",
+                        "rect20__poincare__95.npz",
+                        "rect08__poincare__95.npz",
+                        "rect04__poincare__95.npz"]:
 
     vertices, polygons, boundary = triangulate.load(triangulation_f)
     vertices_k = triangulate._pdisk_to_bkdisk(vertices)
