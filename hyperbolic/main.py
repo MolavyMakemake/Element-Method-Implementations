@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plot, FEM_PDISK_O1, FEM_PDISK_O2, FEM_BKDISK_O1, FEM_BKDISK_O2, triangulate
 
-vertices_p, triangles, boundary = triangulate.load("disk_3760_p.npz")
+vertices_p, triangles, boundary = triangulate.load("37_10s1__poincare__95.npz")
 vertices_bk = triangulate._pdisk_to_bkdisk(vertices_p)
 
 models = (

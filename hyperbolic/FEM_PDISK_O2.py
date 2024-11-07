@@ -35,6 +35,9 @@ class Model:
 
         self.bake()
 
+    def id(self):
+        return "Poincaré k=2"
+
     def bake(self):
         self._bake_domain()
         self._bake_triangles()
@@ -74,7 +77,7 @@ class Model:
         _vertex_map = np.cumsum(self._vertices_mask) - 1
 
         n = _vertex_map[-1] + 1
-        _index_map = np.array([[None, 3, 5], [4, None, 4], [5, 4, None]])
+        _index_map = np.array([[None, 3, 5], [3, None, 4], [5, 4, None]])
         for i in range(len(self.polygons)):
             p_i = self.polygons[i]
             self._mask[i, [0, 1, 2]] = self._vertices_mask[p_i]
@@ -222,7 +225,7 @@ class Model:
         self.L = sp.csc_matrix(L)
 
     def solve_poisson(self, f):
-        u = np.zeros(np.size(self.vertices, axis=1), dtype=complex)
+        self._solution = np.zeros(shape=self._n_elements, dtype=complex)
         b = np.zeros(dtype=complex, shape=(self._n_elements))
 
         print("Integrating...")
@@ -256,8 +259,9 @@ class Model:
 
 
         print("Solving the linear system...")
-        v = sp.linalg.spsolve(self.L, b)
-        u[self._vertices_mask] = v[:np.sum(self._vertices_mask)]
+        self._solution = sp.linalg.spsolve(self.L, b)
+        u = np.zeros(shape=np.size(self.vertices, axis=1), dtype=complex)
+        u[self._vertices_mask] = self._solution[:np.sum(self._vertices_mask)]
         u[self._identify[0]] = u[self._identify[1]]
         return u
 
@@ -287,6 +291,38 @@ class Model:
 
         return A
 
+    def compare(self, u, norm):
+        if norm == "L2":
+            A = 0
+            B = 0
+            for I in range(len(self.polygons)):
+                p0 = self.vertices[:, self.polygons[I][0]]
+                v1 = self.vertices[:, self.polygons[I][1]] - p0
+                v2 = self.vertices[:, self.polygons[I][2]] - p0
+
+                Jac_A = np.abs(v1[0] * v2[1] - v1[1] * v2[0])
+                F1 = lambda x, y: p0[0] + x * v1[0] + y * v2[0]
+                F2 = lambda x, y: p0[1] + x * v1[1] + y * v2[1]
+
+                e = self._solution[self._elements[I, :]]
+                e[np.logical_not(self._mask[I, :])] = 0
+
+                _u = lambda x, y: u(F1(x, y) + 1j * F2(x, y))
+                w = lambda x, y: _u(x, y) \
+                            - e[0] * (1 - 2*x - 2*y) * (1 - x - y) \
+                            - e[1] * x * (2*x - 1) \
+                            - e[2] * y * (2*y - 1) \
+                            - e[3] * 4*x * (1 - x - y) \
+                            - e[4] * 4 * x * y \
+                            - e[5] * 4*y * (1 - x - y)
+
+                A += Jac_A * self._integrator.integrate(
+                    lambda x, y: w(x, y) * np.conj(w(x, y)) * _dVol(F1(x, y), F2(x, y)))
+                B += Jac_A * self._integrator.integrate(
+                    lambda x, y: _u(x, y) * np.conj(_u(x, y)) * _dVol(F1(x, y), F2(x, y)))
+
+
+            return np.sqrt(np.real(A) / np.real(B))
 
 if __name__ == "__main__":
     vertices, polygons, trace = triangulate.generate(p=3, q=7, iterations=3, subdivisions=2, model="Poincare", minimal=True)

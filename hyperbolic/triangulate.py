@@ -132,7 +132,8 @@ def trim_vertices(vertices, polygons, boundary, mask):
     return vertices, polygons, list(_boundary)
 
 # must satisfy (p - 2) * (q - 2) > 4
-def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False):
+def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False, radius=1):
+    R2 = radius * radius
     r = _radius(p, q)
 
     angle = 2 * np.pi / p
@@ -162,27 +163,33 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False):
     for _ in range(iterations):
         N = len(polygons)
 
-        print("Iteration:", _ + 1)
+        print("Iteration:", _ + 1, end='')
         for k in range(p): # iterate over every angle
             m = np.array([l0 * np.cos(k * angle), l0 * np.sin(k * angle)])
+
+            if N > 1000:
+                print(" .", end='')
 
             for i in range(0, N):
                 if flags[i][k]:
                     continue
 
-                poly = set()
-                for v_i in polygons[i]:
-                    x_inv = _invert(X[v_i], m, r0)
+                p_i = list(polygons[i])
+                _inv = [_invert(X[j], m, r0) for j in p_i]
+                if all([x @ x > R2 for x in _inv]):
+                    flags[i][k] = True
+                    continue
 
+                poly = set()
+                for j in range(len(p_i)):
                     for l in range(len(X)):
-                        if ((x_inv - X[l]) @ (x_inv - X[l]) < 1e-10):
+                        if ((_inv[j] - X[l]) @ (_inv[j] - X[l]) < 1e-10):
                             poly.add(l)
                             break
-
                     else:
                         poly.add(len(X))
-                        X.append(x_inv)
-                        Q.append(Q[v_i])
+                        X.append(_inv[j] )
+                        Q.append(Q[p_i[j]])
 
                 for _poly in polygons:
                     if _poly == poly:
@@ -192,6 +199,8 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False):
                     flags.append([_i == k for _i in range(p)])
 
                 flags[i][k] = True
+
+        print()
 
     pre_trace = np.zeros(shape=(len(X)), dtype=int)
     for i in range(len(polygons)):
@@ -223,6 +232,62 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False):
     else:
         return X, polygons, trace.tolist()
 
+def force_disk(vertices, polygons, trace, r):
+    vertices_mask = np.zeros(shape=np.size(vertices, axis=1), dtype=bool)
+    for p_i in polygons:
+        if np.any(np.sum(vertices[:, p_i] * vertices[:, p_i], axis=0) < r * r):
+            vertices_mask[p_i] = True
+
+    vertices, polygons, trace = trim_vertices(vertices, polygons, trace, vertices_mask)
+    for i in trace:
+        vertices[:, i] *= r / np.sqrt(vertices[:, i] @ vertices[:, i])
+
+    return vertices, polygons, trace
+
+def _check_area(vertices, polygons):
+    print("Checking area...")
+    integrator = Integrator.Integrator(100)
+
+    _min = 1e10
+    _max = 0
+    _avg = 0
+    _dVol = lambda x, y: np.power(.5 * (1 - x*x - y*y), -2)
+    for p_i in polygons:
+        p0 = vertices[:, p_i[0]]
+        u = vertices[:, p_i[1]] - p0
+        v = vertices[:, p_i[2]] - p0
+
+        F1 = lambda x, y: p0[0] + x * u[0] + y * v[0]
+        F2 = lambda x, y: p0[1] + x * u[1] + y * v[1]
+
+        area = np.abs(u[0] * v[1] - u[1] * v[0]) * \
+               integrator.integrate(lambda x, y: _dVol(F1(x, y), F2(x, y)))
+
+        _min = min(area, _min)
+        _max = max(area, _max)
+        _avg += area
+
+    print("min:", _min, "; max:", _max, "; avg:", _avg / len(polygons))
+
+if __name__ == "__main__":
+    R = .95
+
+    ax = plt.figure().add_subplot()
+    vertices, polygons, trace = generate(3, 7, iterations=10, subdivisions=0, model="Poincare", minimal=False, radius=R)
+    print(np.sqrt(np.min(np.sum(vertices[:, trace] * vertices[:, trace], axis=0))))
+    vertices, polygons, trace = force_disk(vertices, polygons, trace, R)
+
+    _check_area(vertices, polygons)
+    plot.add_wireframe(ax, vertices, polygons)
+    plt.scatter(vertices[0, trace], vertices[1, trace], s=3)
+
+    #save(vertices, polygons, trace, "37_10s3__poincare__95")
+
+    plt.axis("equal")
+    plt.show()
+
+'''
+
 def force_disk(vertices, polygons, trace, r, s, debug=False):
     R = np.tanh(.5 * r)
     R_l = np.tanh(.5 * (r - s))
@@ -235,6 +300,7 @@ def force_disk(vertices, polygons, trace, r, s, debug=False):
         plt.plot(R_l * np.cos(t), R_l * np.sin(t), linewidth=0.5, color="gray")
 
     else:
+        print("Making disk...")
         vertices, polygons, trace = trim_vertices(vertices, polygons, trace,
                               np.sum(vertices * vertices, axis=0) < R_u * R_u)
 
@@ -278,9 +344,11 @@ def force_disk(vertices, polygons, trace, r, s, debug=False):
             p_i = [j for j in trace_nbh[i] if j > 0]
             if len(p_i) >= 2:
                 plt.scatter(vertices[0, i], vertices[1, i])
-                print(trace_nbh[i])
                 trace.remove(i)
                 polygons.append([i, p_i[0], p_i[1]])
+
+        for i in trace:
+            vertices[:, i] *= R / np.sqrt(vertices[:, i] @ vertices[:, i])
 
     return vertices, polygons, trace
 
@@ -334,42 +402,4 @@ def connect_inactives(vertices, polygons, trace):
             trace.remove(p_i[i2])
 
     return vertices, polygons, trace
-
-def _check_area(vertices, polygons):
-    integrator = Integrator.Integrator(100)
-
-    _min = 1e10
-    _max = 0
-    _avg = 0
-    _dVol = lambda x, y: np.power(.5 * (1 - x*x - y*y), -2)
-    for p_i in polygons:
-        p0 = vertices[:, p_i[0]]
-        u = vertices[:, p_i[1]] - p0
-        v = vertices[:, p_i[2]] - p0
-
-        F1 = lambda x, y: p0[0] + x * u[0] + y * v[0]
-        F2 = lambda x, y: p0[1] + x * u[1] + y * v[1]
-
-        area = np.abs(u[0] * v[1] - u[1] * v[0]) * \
-               integrator.integrate(lambda x, y: _dVol(F1(x, y), F2(x, y)))
-
-        _min = min(area, _min)
-        _max = max(area, _max)
-        _avg += area
-
-    print("min:", _min, "; max:", _max, "; avg:", _avg / len(polygons))
-
-if __name__ == "__main__":
-    ax = plt.figure().add_subplot()
-    vertices, polygons, trace = generate(3, 7, iterations=6, subdivisions=1, model="Poincare", minimal=False)
-    vertices, polygons, trace = force_disk(vertices, polygons, trace, 2.4, 0.2, False)
-    #vertices, polygons, trace = connect_inactives(vertices, polygons, trace)
-
-    _check_area(vertices, polygons)
-    plot.add_wireframe(ax, vertices, polygons)
-    plt.scatter(vertices[0, trace], vertices[1, trace], s=3)
-
-    #save(vertices, polygons, trace, "3761__poincare__disk24")
-
-    plt.axis("equal")
-    plt.show()
+'''

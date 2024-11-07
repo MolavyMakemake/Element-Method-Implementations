@@ -45,30 +45,24 @@ class Model:
 
     def _bake_domain(self):
         self._identify = [[], []]
-        self._exclude = []
+        self._exclude = np.zeros(shape=np.size(self.vertices, axis=1), dtype=bool)
 
         if self.isTraceFixed:
-            self._exclude.extend(self._trace)
+            self._exclude[self._trace] = True
 
     def _bake_triangles(self):
         self.triangles = self.polygons
 
     def _bake_matrices(self):
-        n = 0
-        elements = []
-        self._mask = []
+        self._mask = np.logical_not(self._exclude)
         self._area = []
 
-        for i in range(np.size(self.vertices, axis=1)):
-            if i in self._exclude:
-                elements.append(-1)
-            else:
-                elements.append(n)
-                self._mask.append(i)
-                n += 1
+        elements = np.cumsum(self._mask) - 1
+        n = elements[-1] + 1
 
-        self._elements = np.array(elements)
+        self._elements = elements
         self._elements[self._identify[0]] = self._elements[self._identify[1]]
+        self._n_elements = n
 
         L = np.zeros([n, n])
 
@@ -94,35 +88,39 @@ class Model:
 
             i, j, k = self._elements[v_i], self._elements[v_j], self._elements[v_k]
 
-            if i >= 0:
+            if self._mask[v_i]:
                 L[i, i] += np.dot(v1, v1) * I_0 - D11 * D11 * I11 - 2 * D11 * D21 * I12 - D21 * D21 * I22
-                if j >= 0:
+
+                if self._mask[v_j]:
                     L12 = np.dot(v1, v2) * I_0 - D11 * D12 * I11 - (D21 * D12 + D11 * D22) * I12 - D21 * D22 * I22
                     L[i, j] += L12
                     L[j, i] += L12
-                if k >= 0:
+
+                if self._mask[v_k]:
                     L13 = np.dot(v1, v3) * I_0 - D11 * D13 * I11 - (D21 * D13 + D11 * D23) * I12 - D21 * D23 * I22
                     L[i, k] += L13
                     L[k, i] += L13
 
-            if j >= 0:
+            if self._mask[v_j]:
                 L[j, j] += np.dot(v2, v2) * I_0 - D12 * D12 * I11 - 2 * D12 * D22 * I12 - D22 * D22 * I22
-                if k >= 0:
+
+                if self._mask[v_k]:
                     L23 = np.dot(v2, v3) * I_0 - D12 * D13 * I11 - (D22 * D13 + D12 * D23) * I12 - D22 * D23 * I22
                     L[j, k] += L23
                     L[k, j] += L23
 
-            if k >= 0:
+            if self._mask[v_k]:
                 L[k, k] += np.dot(v3, v3) * I_0 - D13 * D13 * I11 - 2 * D13 * D23 * I12 - D23 * D23 * I22
 
             #print(L)
 
         self.L = sp.csc_matrix(L)
 
-    def solve_poisson(self, f):
-        u = np.zeros(np.size(self.vertices, axis=1), dtype=complex)
+    def id(self):
+        return "Klein k=1"
 
-        b = np.zeros(dtype=complex, shape=(len(self._mask)))
+    def solve_poisson(self, f):
+        b = np.zeros(dtype=complex, shape=self._n_elements)
 
         for v_i, v_j, v_k in self.polygons:
             v1 = self.vertices[:, v_k] - self.vertices[:, v_j]
@@ -137,14 +135,16 @@ class Model:
 
             i, j, k = self._elements[v_i], self._elements[v_j], self._elements[v_k]
 
-            if i >= 0:
+            if self._mask[v_i]:
                 b[i] += Jac_A * self._integrator.integrate(lambda x, y: _f_dv(x, y) * (1 - x - y))
-            if j >= 0:
+            if self._mask[v_j]:
                 b[j] += Jac_A * self._integrator.integrate(lambda x, y: _f_dv(x, y) * x)
-            if k >= 0:
+            if self._mask[v_k]:
                 b[k] += Jac_A * self._integrator.integrate(lambda x, y: _f_dv(x, y) * y)
 
-        u[self._mask] = sp.linalg.spsolve(self.L, b)
+        self._solution = sp.linalg.spsolve(self.L, b)
+        u = np.zeros(np.size(self.vertices, axis=1), dtype=complex)
+        u[self._mask] = self._solution
         u[self._identify[0]] = u[self._identify[1]]
         return u
 
@@ -173,6 +173,33 @@ class Model:
 
     def fd_center(self):
         return np.average(self.vertices[0, self._mask] + 1j * self.vertices[1, self._mask])
+
+    def compare(self, u, norm):
+        if norm == "L2":
+            A = 0
+            B = 0
+            for p_i in self.polygons:
+                p0 = self.vertices[:, p_i[0]]
+                v1 = self.vertices[:, p_i[1]] - p0
+                v2 = self.vertices[:, p_i[2]] - p0
+
+                Jac_A = np.abs(v1[0] * v2[1] - v1[1] * v2[0])
+                F1 = lambda x, y: p0[0] + x * v1[0] + y * v2[0]
+                F2 = lambda x, y: p0[1] + x * v1[1] + y * v2[1]
+
+                e = self._solution[self._elements[p_i]]
+                e[np.logical_not(self._mask[p_i])] = 0
+
+                _u = lambda x, y: u(F1(x, y) + 1j * F2(x, y))
+                w = lambda x, y: _u(x, y) - e[0] * (1 - x - y) - e[1] * x - e[2] * y
+
+                A += Jac_A * self._integrator.integrate(
+                    lambda x, y: w(x, y) * np.conj(w(x, y)) * _dVol(F1(x, y), F2(x, y)))
+                B += Jac_A * self._integrator.integrate(
+                    lambda x, y: _u(x, y) * np.conj(_u(x, y)) * _dVol(F1(x, y), F2(x, y)))
+
+            return np.sqrt(np.real(A) / np.real(B))
+
 
 
 if __name__ == "__main__":
