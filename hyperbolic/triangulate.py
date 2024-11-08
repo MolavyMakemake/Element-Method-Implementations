@@ -50,9 +50,9 @@ def _midpoint(vertices, triangles, _int, _dVol):
     y_m = 0
     A = 0
     for i0, i1, i2 in triangles:
-        p0 = vertices[i0]
-        v1 = vertices[i1] - p0
-        v2 = vertices[i2] - p0
+        p0 = vertices[:, i0]
+        v1 = vertices[:, i1] - p0
+        v2 = vertices[:, i2] - p0
 
         Jac_A = np.abs(v1[0] * v2[1] - v1[1] * v2[0])
         F1 = lambda x, y: p0[0] + v1[0] * x + v2[0] * y
@@ -162,7 +162,7 @@ def subdivide_square(polygons, vertices):
                 n += 1
 
         c = _midpoint(
-            vertices=[vertices[i] for i in p_i],
+            vertices=np.array([vertices[i] for i in p_i]).T,
             triangles=[[0, 1, 2], [0, 2, 3]],
             _int=_int, _dVol=_dVol
         )
@@ -303,6 +303,22 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False, si
     else:
         return X, polygons, trace.tolist()
 
+def retract(vertices, polygons, trace, dVol):
+    trace_mask = np.zeros(shape=np.size(vertices, axis=1), dtype=bool)
+    trace_mask[trace] = True
+    vert_nbh = [[] for _ in range(np.size(vertices, axis=1))]
+
+    for p_i in polygons:
+        for i in p_i:
+            if trace_mask[i]:
+                vert_nbh[i].append(p_i)
+
+    _int = Integrator.Integrator(100)
+    for i in trace:
+        vertices[:, i] = _midpoint(vertices, vert_nbh[i], _int, dVol)
+
+    return vertices, polygons, trace
+
 def force_disk(vertices, polygons, trace, r):
     vertices_mask = np.zeros(shape=np.size(vertices, axis=1), dtype=bool)
     for p_i in polygons:
@@ -315,7 +331,7 @@ def force_disk(vertices, polygons, trace, r):
 
     return vertices, polygons, trace
 
-def force_rect(vertices, polygons, trace, r, debug=True):
+def force_rect(vertices, polygons, trace, r, threshold=1e-1, debug=True):
     trace_mask = np.zeros(shape=np.size(vertices, axis=1), dtype=bool)
     trace_mask[trace] = True
 
@@ -340,17 +356,45 @@ def force_rect(vertices, polygons, trace, r, debug=True):
     trace = [i for i in range(len(trace_mask)) if trace_mask[i]]
     vertices, polygons, trace = trim_vertices(vertices, polygons, trace, vertices_mask)
 
+    trace_mask = np.zeros(shape=np.size(vertices, axis=1), dtype=bool)
+    trace_mask[trace] = True
+    vert_nbh = [[] for _ in range(np.size(vertices, axis=1))]
+    for p_i in polygons:
+        for i in p_i:
+            if trace_mask[i]:
+                vert_nbh[i].append(p_i)
+
+    _int = Integrator.Integrator(100)
+    _vert = np.zeros(shape=(2, len(trace)), dtype=float)
+    for I in range(len(trace)):
+        v = vertices[:, trace[I]]
+        for _ in range(10):
+            w = np.abs(v)
+            if np.max(w) < r:
+                break
+
+            dst = np.min((w - r) * (w - r))
+            if dst < threshold:
+                break
+
+            v = _midpoint(vertices, vert_nbh[trace[I]], _int, lambda x, y: np.power(1 - x*x - y*y, -1.5))
+
+        _vert[:, I] = v
+
+    vertices[:, trace] = _vert
+
     if debug:
         plt.plot([-r, r, r, -r, -r], [r, r, -r, -r, r])
         return vertices, polygons, trace
 
-
     for i in trace:
         a, b = np.abs(vertices[:, i])
-        if a > r:
+        if a > r and b > r:
             vertices[0, i] *= r / a
-            vertices[1, i] *= vertices[1, i] / r
-        if b > r:
+            vertices[1, i] *= r / b
+        elif a > b:
+            vertices[0, i] *= r / a
+        else:
             vertices[1, i] *= r / b
 
     fixed_points = [
@@ -437,14 +481,17 @@ def rect(h):
 
 def plot_triangulation(filename):
     fig = plt.figure(figsize=plt.figaspect(1.0))
-    ax = fig.add_subplot(xlim=(-1, 1), ylim=(-1, 1))
+    ax = fig.add_subplot(xlim=(-1.01, 1.01), ylim=(-1.05, 1.05))
     plt.axis("off")
+
+    t = np.linspace(0, 2 * np.pi, 60)
+    plt.plot(np.cos(t), np.sin(t), "--", color="gray", linewidth=.8)
 
     vertices, polygons, trace = load("./triangulations/" + filename + ".npz")
     plot.add_wireframe(ax, vertices, polygons)
 
     extent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-    plt.savefig("./figures/" + filename + ".png", bbox_inches=extent)
+    plt.savefig("./figures/" + filename + ".png", bbox_inches=extent, transparent=True)
 
 def _generate_uniform_rect(R, n_it, n_sd):
     W = R / np.sqrt(2)
@@ -465,8 +512,7 @@ def _generate_uniform_rect(R, n_it, n_sd):
         m1 = _midpoint_bkdisk(vertices[:, i2], vertices[:, i3])
 
         c = _midpoint(
-            vertices=[vertices[:, i0], vertices[:, i1],
-                      vertices[:, i2], vertices[:, i3]],
+            vertices=vertices[:, [i0, i1, i2, i3]],
             triangles=[[0, 1, 2], [0, 2, 3]],
             _int=_int, _dVol=_dVol
         )
@@ -481,28 +527,33 @@ def _generate_uniform_rect(R, n_it, n_sd):
         n += 1
 
     vertices = np.append(vertices, np.array(_vert).T, axis=1)
-    vertices, polygons, trace = force_rect(vertices, polygons, trace, W, debug=False)
-    #vertices, polygons, trace = _fix_area(vertices, polygons, trace, 1e-10)
+    vertices, polygons, trace = force_rect(vertices, polygons, trace, W, 1e-5, debug=False)
+
+    vertices = _bkdisk_to_pdisk(vertices)
+    vertices, polygons, trace = _fix_area(vertices, polygons, trace, 1e-10)
 
     return vertices, polygons, trace
 
 if __name__ == "__main__":
     '''
-    plot_triangulation("38_6s0__poincare__r95")
-    plot_triangulation("38_6s1__poincare__r95")
-    plot_triangulation("38_6s2__poincare__r95")
-    plot_triangulation("38_6s3__poincare__r95")
+    plot_triangulation("45_4s1__poincare__r994")
+    plot_triangulation("45_4s2__poincare__r994")
+    plot_triangulation("45_4s3__poincare__r994")
+    plot_triangulation("45_4s4__poincare__r994")
     '''
 
     #'''
     ax = plt.figure().add_subplot()
 
-    vertices, polygons, trace = _generate_uniform_rect(0.994, n_it=4, n_sd=1)
+    vertices, polygons, trace = rect(0.20)
+    vertices *= .994 / np.sqrt(2)
+
+    vertices = _bkdisk_to_pdisk(vertices)
 
     plot.add_wireframe(ax, vertices, polygons)
     plt.scatter(vertices[0, trace], vertices[1, trace], s=3)
 
-    save(vertices, polygons, trace, "45_4s1__poincare__r994")
+    #save(vertices, polygons, trace, "rect35__poincare__r994")
 
     plt.axis("equal")
     plt.show()
