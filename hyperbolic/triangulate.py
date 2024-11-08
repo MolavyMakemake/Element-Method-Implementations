@@ -367,19 +367,17 @@ def force_rect(vertices, polygons, trace, r, threshold=1e-1, debug=True):
     _int = Integrator.Integrator(100)
     _vert = np.zeros(shape=(2, len(trace)), dtype=float)
     for I in range(len(trace)):
-        v = vertices[:, trace[I]]
-        for _ in range(10):
-            w = np.abs(v)
-            if np.max(w) < r:
-                break
-
-            dst = np.min((w - r) * (w - r))
-            if dst < threshold:
+        v0 = np.copy(vertices[:, trace[I]])
+        v = np.copy(v0)
+        for _ in range(20):
+            if np.max(np.abs(v)) < r + threshold:
                 break
 
             v = _midpoint(vertices, vert_nbh[trace[I]], _int, lambda x, y: np.power(1 - x*x - y*y, -1.5))
+            vertices[:, trace[I]] = v
 
         _vert[:, I] = v
+        vertices[:, trace[I]] = v0
 
     vertices[:, trace] = _vert
 
@@ -490,8 +488,12 @@ def plot_triangulation(filename):
     vertices, polygons, trace = load("./triangulations/" + filename + ".npz")
     plot.add_wireframe(ax, vertices, polygons)
 
+    d = np.max(np.sum(vertices * vertices, axis=0))
+    d = np.sqrt(d)
+    print(d / (1 + np.sqrt(1 - d*d)))
+
     extent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-    plt.savefig("./figures/" + filename + ".png", bbox_inches=extent, transparent=True)
+    #plt.savefig("./figures/" + filename + ".png", bbox_inches=extent, transparent=True)
 
 def _generate_uniform_rect(R, n_it, n_sd):
     W = R / np.sqrt(2)
@@ -527,7 +529,7 @@ def _generate_uniform_rect(R, n_it, n_sd):
         n += 1
 
     vertices = np.append(vertices, np.array(_vert).T, axis=1)
-    vertices, polygons, trace = force_rect(vertices, polygons, trace, W, 1e-5, debug=False)
+    vertices, polygons, trace = force_rect(vertices, polygons, trace, W, 1e-2, debug=False)
 
     vertices = _bkdisk_to_pdisk(vertices)
     vertices, polygons, trace = _fix_area(vertices, polygons, trace, 1e-10)
@@ -535,29 +537,36 @@ def _generate_uniform_rect(R, n_it, n_sd):
     return vertices, polygons, trace
 
 if __name__ == "__main__":
-    '''
-    plot_triangulation("45_4s1__poincare__r994")
-    plot_triangulation("45_4s2__poincare__r994")
-    plot_triangulation("45_4s3__poincare__r994")
-    plot_triangulation("45_4s4__poincare__r994")
-    '''
-
     #'''
+    plot_triangulation("rect35__klein__d95")
+    plot_triangulation("rect20__klein__d95")
+    plot_triangulation("rect08__klein__d95")
+    plot_triangulation("rect04__klein__d95")
+    plt.show()
+    #'''
+
+    '''
     ax = plt.figure().add_subplot()
+    r = .95
 
-    vertices, polygons, trace = rect(0.20)
-    vertices *= .994 / np.sqrt(2)
+    r_k = 2 * r / (1 + r*r)
+    vertices, polygons, trace = rect(0.04)
+    #vertices *= r_k / np.sqrt(2)
 
-    vertices = _bkdisk_to_pdisk(vertices)
+    #vertices = _pdisk_to_bkdisk(vertices)
+    vertices, polygons, trace = force_disk(vertices, polygons, trace, r_k)
+    #vertices = _bkdisk_to_pdisk(vertices)
+#
+    #vertices, polygons, trace = _fix_area(vertices, polygons, trace, 1e-2)
 
     plot.add_wireframe(ax, vertices, polygons)
     plt.scatter(vertices[0, trace], vertices[1, trace], s=3)
 
-    #save(vertices, polygons, trace, "rect35__poincare__r994")
+    save(vertices, polygons, trace, "rect04__klein__d95")
 
     plt.axis("equal")
     plt.show()
-    #'''
+    '''
 '''
 
 def force_disk(vertices, polygons, trace, r, s, debug=False):

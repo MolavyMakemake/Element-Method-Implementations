@@ -22,37 +22,36 @@ def compute_h(vertices, polygons):
 
 R = .95
 
-#g0 = lambda t: -np.log(1 - t)
-#c = g0(R * R)
-#
-#v = lambda z: c - g0(z * np.conj(z))
-#f = lambda z: 1
+g0 = lambda t: -np.log(1 - t)
+c = g0(R * R)
+v = lambda z: c - g0(z * np.conj(z))
+f = lambda z: 1
 
-v = lambda z: R * R - z * np.conj(z)
-f = lambda z: np.power(1 - z * np.conj(z), 2)
+#v = lambda z: R * R - z * np.conj(z)
+#f = lambda z: np.power(1 - z * np.conj(z), 2)
 
 v_k = lambda z: v(z / (1 + np.sqrt(1 - z * np.conj(z))))
-f_k = lambda z: f(z / (1 + np.sqrt(1 - z * np.conj(z))))
+#f_k = lambda z: f(z / (1 + np.sqrt(1 - z * np.conj(z))))
 
-V = [v, v, v_k, v_k]
-F = [f, f, f_k, f_k]
+V = [v_k, v_k]
+F = [f, f]
 
 H = []
 Y = [[] for _ in range(len(F))]
 
-for triangulation_f in ["rect35__poincare__95.npz",
-                        "rect20__poincare__95.npz",
-                        "rect08__poincare__95.npz",
-                        "rect04__poincare__95.npz"]:
+for triangulation_f in ["./triangulations/rect35__klein__d95.npz",
+                        "./triangulations/rect20__klein__d95.npz",
+                        "./triangulations/rect08__klein__d95.npz",
+                        "./triangulations/rect04__klein__d95.npz"]:
 
     vertices, polygons, boundary = triangulate.load(triangulation_f)
-    vertices_k = triangulate._pdisk_to_bkdisk(vertices)
+    #vertices_k = triangulate._pdisk_to_bkdisk(vertices)
 
     models = [
-        FEM_PDISK_O1.Model(vertices, polygons, boundary),
-        FEM_PDISK_O2.Model(vertices, polygons, boundary),
-        FEM_BKDISK_O1.Model(vertices_k, polygons, boundary),
-        FEM_BKDISK_O2.Model(vertices_k, polygons, boundary)
+        #FEM_PDISK_O1.Model(vertices, polygons, boundary),
+        #FEM_PDISK_O2.Model(vertices, polygons, boundary),
+        FEM_BKDISK_O1.Model(vertices, polygons, boundary),
+        FEM_BKDISK_O2.Model(vertices, polygons, boundary)
     ]
 
     H.append(compute_h(vertices, polygons))
@@ -66,7 +65,7 @@ for y in Y:
 
 plt.loglog(H, Y[0], "o--", color="black", label="Poincaré k=1")
 plt.loglog(H, Y[1], "<--", color="black", label="Poincaré k=2")
-plt.loglog(H, Y[2], "o--", color="gray", label="Klein k=1")
-plt.loglog(H, Y[3], "<--", color="gray", label="Klein k=2")
+#plt.loglog(H, Y[2], "o--", color="gray", label="Klein k=1")
+#plt.loglog(H, Y[3], "<--", color="gray", label="Klein k=2")
 plt.legend()
 plt.show()
