@@ -1,7 +1,7 @@
 import numpy as np
 
 class Integrator:
-    def __init__(self, res):
+    def __init__(self, res, open=False):
         self.vertices = np.zeros([2, res * (res + 1) // 2])
 
         y = np.repeat(range(res), range(res, 0, -1))
@@ -9,6 +9,9 @@ class Integrator:
 
         self.vertices[0, :] = x / (res - 1)
         self.vertices[1, :] = y / (res - 1)
+
+        self.x = x
+        self.y = y
 
         self.weight = np.zeros(dtype=float, shape=(np.size(self.vertices, axis=1)))
 
@@ -27,5 +30,16 @@ class Integrator:
         h = 1.0 / (res - 1.0)
         self.weight *= h * h / 6.0
 
+        if open:
+            e = 1e-3 / (res - 1)
+            self.vertices = e + self.vertices * (1 - 3 * e)
+
     def integrate(self, F, axis=0):
-        return np.sum(F(self.vertices[0, :], self.vertices[1, :]) * self.weight, axis=0)
+        return np.sum(F(self.vertices[0, :], self.vertices[1, :]) * self.weight, axis=axis)
+
+    def integrate_vector(self, v):
+        return np.sum(v * self.weight, axis=0)
+
+    def mask(self, arg):
+        if arg == "l":
+            return self.x > 0

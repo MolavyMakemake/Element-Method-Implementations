@@ -297,11 +297,14 @@ def generate(p, q, iterations, subdivisions, model="Poincare", minimal=False, si
 
         X, polygons, trace = trim_vertices(X, polygons, trace, vertices_mask)
 
+    else:
+        trace = trace.tolist()
+
     if model == "Klein":
-        return _pdisk_to_bkdisk(X), polygons, trace.tolist()
+        return _pdisk_to_bkdisk(X), polygons, trace
 
     else:
-        return X, polygons, trace.tolist()
+        return X, polygons, trace
 
 def retract(vertices, polygons, trace, dVol):
     trace_mask = np.zeros(shape=np.size(vertices, axis=1), dtype=bool)
@@ -537,14 +540,21 @@ def _generate_uniform_rect(R, n_it, n_sd):
     return vertices, polygons, trace
 
 if __name__ == "__main__":
-    #'''
+    '''
     plot_triangulation("rect35__klein__d95")
     plot_triangulation("rect20__klein__d95")
     plot_triangulation("rect08__klein__d95")
     plot_triangulation("rect04__klein__d95")
     plt.show()
-    #'''
+    '''
 
+    ax = plt.figure().add_subplot()
+
+    vertices, polygons, trace = load("./triangulations/rect04__poincare__d95.npz")
+    plot.add_wireframe(ax, vertices, polygons)
+    plt.scatter(vertices[0, trace], vertices[1, trace], s=1)
+    plt.axis("equal")
+    plt.show()
     '''
     ax = plt.figure().add_subplot()
     r = .95

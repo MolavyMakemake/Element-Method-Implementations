@@ -21,17 +21,31 @@ def compute_h(vertices, polygons):
     return h
 
 R = .95
+W = R / np.sqrt(2)
+
+def v(z):
+    return -np.log(1 - z * np.conj(z))
+
+    x2 = np.real(z) * np.real(z)
+    y2 = np.imag(z) * np.imag(z)
+    return .5 * (W * W - np.maximum(x2, y2))
+def f(z):
+    return 1
+    x2 = np.real(z) * np.real(z)
+    y2 = np.imag(z) * np.imag(z)
+    a = np.maximum(x2, y2)
+    b = np.minimum(x2, y2)
+    return 3 * a*a + 3 * a*b - 4 * b + 1
 
 g0 = lambda t: -np.log(1 - t)
 c = g0(R * R)
 v = lambda z: c - g0(z * np.conj(z))
-f = lambda z: 1
 
 #v = lambda z: R * R - z * np.conj(z)
 #f = lambda z: np.power(1 - z * np.conj(z), 2)
 
 v_k = lambda z: v(z / (1 + np.sqrt(1 - z * np.conj(z))))
-#f_k = lambda z: f(z / (1 + np.sqrt(1 - z * np.conj(z))))
+f_p = lambda z: v(2 * z / (1 + z * np.conj(z)))
 
 V = [v_k, v_k]
 F = [f, f]

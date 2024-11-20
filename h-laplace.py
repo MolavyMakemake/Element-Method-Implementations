@@ -2,35 +2,48 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 res = 100
-size = 10
+size = 1
 
 _s = np.tanh(size / 2) / np.sqrt(2)
 dx = dy = 2 * _s / (res - 1)
-X, Y = np.meshgrid(np.linspace(-_s, _s, res), np.linspace(-_s, _s, res))
+
+X = np.zeros(shape=(2, res * res), dtype=float)
+_X0, _X1 = np.meshgrid(np.linspace(-_s, _s, res), np.linspace(-_s, _s, res))
+
+X[0, :] = _X0.flatten()
+X[1, :] = _X1.flatten()
 
 #X, Y = np.meshgrid(np.linspace(-size, size, res), np.linspace(-size, size, res))
 #_R = np.sqrt(X * X + Y * Y); _r = np.tanh(_R / 2)
 #X *= _r / _R; Y *= _r / _R
 
 
-u = np.array([0, .5])
+u = np.array([-.2, .8])
 v = np.array([0, 0])
 
-def d(x, y, w):
-    a = x - w[0]
-    b = y - w[1]
-    return 1 + 2 * (a*a + b*b) / ((1 - x*x - y*y) * (1 - w @ w))
+d_uv = 1 + 2 * ((u - v) @ (u - v)) / ((1 - u@u) * (1 - v@v))
 
-def A_tri(x, y):
-    w = np.array([x, y])
-    d0 = d(u[0], u[1], v)
-    d1 = d(x, y, u)
-    d2 = d(x, y, v)
+def d(x, w):
+    u = np.zeros_like(x)
+    u[0, :] = x[0, :] - w[0]
+    u[1, :] = x[1, :] - w[1]
+
+    u2 = np.sum(u * u, axis=0)
+    x2 = np.sum(x * x, axis=0)
+    w2 = np.sum(w * w, axis=0)
+    return 1 + 2 * u2 / ((1 - x2) * (1 - w2))
+
+def A_tri(x):
+    d0 = d_uv
+    d1 = d(x, u)
+    d2 = d(x, v)
 
     A = 1 - d0 * d0 - d1 * d1 - d2 * d2 + 2 * d0 * d1 * d2
     B = 1 + d0 + d1 + d2
 
-    return 2 * np.atan(np.sqrt(A) / B) * np.sign((u[0] - X) * (v[1] - u[1]) - (u[1] - Y) * (v[0] - u[0]))
+    sgn = 2 * (x[0, :] > 0) - 1
+    sgn = 1
+    return 2 * sgn * np.atan(np.sqrt(np.abs(A)) / B)
 
 def A_htri(x, y):
     def sign (A, B):
@@ -75,10 +88,34 @@ def A_ihtri(x, y):
     return A
 
 
-F = A_tri(X, Y)
-DF = np.gradient(F, dx, dy)
+def D1V(x):
+    d0 = d_uv
+    d1 = d(x, u)
+    d2 = d(x, v)
 
-k = .5 * (1 - X * X - Y * Y)
+    xu = x - u[:, np.newaxis]
+    xv = x - v[:, np.newaxis]
+
+    x2 = np.sum(x * x, axis=0)
+
+    D1d1 = 2 * (d1 - 1) * x[1, :] / (1 - x2) + 4 * xu[1, :] / ((1 - u @ u) * (1 - x2))
+    D1d2 = 2 * (d2 - 1) * x[1, :] / (1 - x2) + 4 * xv[1, :] / ((1 - v @ v) * (1 - x2))
+
+    A = 1 - d0*d0 - d1*d1 - d2*d2 + 2 * d0 * d1 * d2
+    B = 1 + d0 + d1 + d2
+
+    V = np.sqrt(A) / B
+    a = (-d1 * D1d1 - d2 * D1d2 + d0 * d1 * D1d2 + d0 * D1d1 * d2)
+    b = (D1d1 + D1d2)
+
+    M = np.max(2 * np.atan(V))
+    return 2 * V / (1 + V*V) * (a / A - b / B)
+    #return D1d1
+
+F = A_tri(X)
+DF = np.gradient(np.reshape(F, (res, res)), dx, dy)
+
+k = .5 * (1 - _X0 * _X0 - _X1 * _X1)
 DgF1 = np.gradient(DF[0], dx, axis=0)
 DgF2 = np.gradient(DF[1], dy, axis=1)
 LgF = k * k * (DgF1 + DgF2)
@@ -88,8 +125,10 @@ ax = plt.axes(projection='3d')
 ax.set_xlabel("x")
 ax.set_ylabel("y")
 
-ax.plot_surface(X, Y, DgF1, label="f_1")
-ax.plot_surface(X, Y, DgF2, label="f_2")
+ax.plot_surface(_X0, _X1, DF[0], label="f_1")
+ax.scatter(X[0, :], X[1, :], D1V(X), s=0.1, color="yellow")
+#ax.plot_surface(_X0, _X1, np.clip(np.reshape(D1V(X), (res, res)), -1, 1), label="f_1")
+#ax.plot_surface(X, Y, k * k * DF[1], label="f_2")
 #ax.plot_surface(X, Y, np.clip(LgF, -1, 1), label="Lf")
 ax.legend()
 plt.show()
