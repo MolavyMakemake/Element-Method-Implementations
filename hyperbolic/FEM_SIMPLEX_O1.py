@@ -44,7 +44,7 @@ def _V(u, v, x):
     DV = (2 * V / (1 + V * V) * (a1 / A - b1 / B),
        2 * V / (1 + V * V) * (a2 / A - b2 / B))
 
-    vol = 2 * np.atan(V)
+    vol = 2 * np.arctan(V)
     M = np.max(vol)
 
     return vol / M, DV[0] / M, DV[1] / M

@@ -496,7 +496,7 @@ def plot_triangulation(filename):
     print(d / (1 + np.sqrt(1 - d*d)))
 
     extent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-    #plt.savefig("./figures/" + filename + ".png", bbox_inches=extent, transparent=True)
+    plt.savefig("./figures/" + filename + ".png", bbox_inches=extent, transparent=True)
 
 def _generate_uniform_rect(R, n_it, n_sd):
     W = R / np.sqrt(2)
@@ -550,9 +550,11 @@ if __name__ == "__main__":
 
     ax = plt.figure().add_subplot()
 
-    vertices, polygons, trace = load("./triangulations/rect04__poincare__d95.npz")
+    vertices, polygons, trace = generate(p=3, q=7, iterations=7, subdivisions=2, model="Poincare", minimal=True)
+    t = np.linspace(0, 2 * np.pi, 60)
+    plt.plot(np.cos(t), np.sin(t), "--", color="gray", linewidth=.8)
     plot.add_wireframe(ax, vertices, polygons)
-    plt.scatter(vertices[0, trace], vertices[1, trace], s=1)
+    #plt.scatter(vertices[0, trace], vertices[1, trace], s=1)
     plt.axis("equal")
     plt.show()
     '''
