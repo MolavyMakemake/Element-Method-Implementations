@@ -170,7 +170,7 @@ class Model:
                     L[e[2], e[1]] += L12
 
                 if self._mask[i, 3]:
-                    L13 = 2.0 / (3 * Jac_A) * np.dot(v0, v1)
+                    L13 = 2.0 / (3 * Jac_A) * np.dot(v1, v0)
                     L[e[1], e[3]] += L13
                     L[e[3], e[1]] += L13
 
@@ -189,12 +189,12 @@ class Model:
                     pass
 
                 if self._mask[i, 4]:
-                    L24 = 2.0 / (3 * Jac_A) * np.dot(v1, v2)
+                    L24 = 2.0 / (3 * Jac_A) * np.dot(v2, v1)
                     L[e[2], e[4]] += L24
                     L[e[4], e[2]] += L24
 
                 if self._mask[i, 5]:
-                    L25 = 2.0 / (3 * Jac_A) * np.dot(v0, v2)
+                    L25 = 2.0 / (3 * Jac_A) * np.dot(v2, v0)
                     L[e[2], e[5]] += L25
                     L[e[5], e[2]] += L25
 

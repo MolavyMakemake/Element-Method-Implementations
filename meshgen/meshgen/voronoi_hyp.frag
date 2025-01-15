@@ -1,6 +1,6 @@
 #version 430 core
 
-const int N = 128;
+const int N = 512;
 
 uniform float R;
 

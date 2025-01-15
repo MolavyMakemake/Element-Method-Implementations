@@ -1,6 +1,6 @@
 #version 430 core
 
-const int N = 128;
+const int N = 512;
 uniform int R;
 
 in vec2 pos;
@@ -14,15 +14,26 @@ void main()
 {
 	vec2 v;
 	float d = 1000;
+
+	int j = 0;
+	bool isMinimum;
+	float _d;
 	for (int i = 0; i < N; i++) {
 		v = vertices[i].xy - pos;
-		d = min(d, dot(v, v));
+		_d = dot(v, v);
+		isMinimum = _d < d;
+		d = isMinimum ? _d : d;
+		j = isMinimum ? 2 * i : j;
 
 		v = vertices[i].zw - pos;
-		d = min(d, dot(v, v));
+		_d = dot(v, v);
+		isMinimum = _d < d;
+		d = isMinimum ? _d : d;
+		j = isMinimum ? 2 * i + 1 : j;
 	}
 
-	d = min(sqrt(d), abs(1 - length(pos)));
+	//d = min(sqrt(d), abs(1 - length(pos)));
+	d = sqrt(d);
 
-	FragColor = vec4(d);
+	FragColor = vec4(d, j, 0, 0);
 }

@@ -1,6 +1,2 @@
-﻿  window.cpp
-D:\Users\47452\source\Element-Method-Implementations\meshgen\meshgen\window.cpp(60,40): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-D:\Users\47452\source\Element-Method-Implementations\meshgen\meshgen\window.cpp(60,21): warning C4244: 'initializing': conversion from 'double' to 'const float', possible loss of data
-D:\Users\47452\source\Element-Method-Implementations\meshgen\meshgen\window.cpp(71,40): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-D:\Users\47452\source\Element-Method-Implementations\meshgen\meshgen\window.cpp(71,21): warning C4244: 'initializing': conversion from 'double' to 'const float', possible loss of data
+﻿  generate_hyp.cpp
   meshgen.vcxproj -> D:\Users\47452\source\Element-Method-Implementations\meshgen\x64\Debug\meshgen.exe

@@ -16,13 +16,18 @@ def _V(u, v, x):
     xu = x - u[:, np.newaxis]
     xv = x - v[:, np.newaxis]
 
+    xu2 = np.sum(xu * xu, axis=0)
+    xv2 = np.sum(xv * xv, axis=0)
     x2 = np.sum(x * x, axis=0)
 
-    Dd1 = (2 * (d1 - 1) * x[0, :] / (1 - x2) + 4 * xu[0, :] / ((1 - x2) * (1 - u @ u)),
-           2 * (d1 - 1) * x[1, :] / (1 - x2) + 4 * xu[1, :] / ((1 - x2) * (1 - u @ u)))
+    s1 = 4.0 / ((1 - x2) * (1 - u @ u) * np.sqrt(d1 * d1 - 1))
+    s2 = 4.0 / ((1 - x2) * (1 - v @ v) * np.sqrt(d2 * d2 - 1))
 
-    Dd2 = (2 * (d2 - 1) * x[0, :] / (1 - x2) + 4 * xv[0, :] / ((1 - x2) * (1 - v @ v)),
-           2 * (d2 - 1) * x[1, :] / (1 - x2) + 4 * xv[1, :] / ((1 - x2) * (1 - v @ v)))
+    Dd1 = (s1 * (xu[0, :] + x[0, :] * xu2 / (1 - x2)),
+           s1 * (xu[1, :] + x[1, :] * xu2 / (1 - x2)))
+
+    Dd2 = (s2 * (xv[0, :] + x[0, :] * xv2 / (1 - x2)),
+           s2 * (xv[1, :] + x[1, :] * xv2 / (1 - x2)))
 
     A = 1 - d0 * d0 - d1 * d1 - d2 * d2 + 2 * d0 * d1 * d2
     B = 1 + d0 + d1 + d2
@@ -41,7 +46,7 @@ def _V(u, v, x):
 
     return vol / M, DV[0] / M, DV[1] / M
 
-_int = Integrator.Integrator(200, open=True)
+_int = Integrator.Integrator(50, open=True)
 
 p0 = np.array([0, 0])
 p1 = np.array([.5, 0])

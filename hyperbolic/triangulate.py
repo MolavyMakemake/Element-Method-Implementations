@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import plot
+import hyperbolic.plot as plot
 from tempfile import TemporaryFile
-import Integrator
+import hyperbolic.Integrator as Integrator
 
 def save(vertices, polygons, boundary, filename):
     np.savez("./triangulations/" + filename, vertices=vertices, polygons=polygons, boundary=boundary)
@@ -485,8 +485,8 @@ def plot_triangulation(filename):
     ax = fig.add_subplot(xlim=(-1.01, 1.01), ylim=(-1.05, 1.05))
     plt.axis("off")
 
-    t = np.linspace(0, 2 * np.pi, 60)
-    plt.plot(np.cos(t), np.sin(t), "--", color="gray", linewidth=.8)
+    #t = np.linspace(0, 2 * np.pi, 60)
+    #plt.plot(np.cos(t), np.sin(t), "--", color="gray", linewidth=.8)
 
     vertices, polygons, trace = load("./triangulations/" + filename + ".npz")
     plot.add_wireframe(ax, vertices, polygons)
@@ -496,7 +496,7 @@ def plot_triangulation(filename):
     print(d / (1 + np.sqrt(1 - d*d)))
 
     extent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-    plt.savefig("./figures/" + filename + ".png", bbox_inches=extent, transparent=True)
+    plt.savefig("./figures/" + filename + ".png", dpi=300, bbox_inches=extent, transparent=True)
 
 def _generate_uniform_rect(R, n_it, n_sd):
     W = R / np.sqrt(2)
@@ -540,11 +540,12 @@ def _generate_uniform_rect(R, n_it, n_sd):
     return vertices, polygons, trace
 
 if __name__ == "__main__":
-    '''
-    plot_triangulation("rect35__klein__d95")
-    plot_triangulation("rect20__klein__d95")
-    plot_triangulation("rect08__klein__d95")
-    plot_triangulation("rect04__klein__d95")
+    plot_triangulation("uniform_disk_hyp_256")
+    plot_triangulation("uniform_disk_hyp_512")
+    plot_triangulation("uniform_disk_hyp_1024")
+    plot_triangulation("uniform_disk_hyp_2048")
+    plot_triangulation("uniform_disk_hyp_4096")
+    plot_triangulation("uniform_disk_hyp_8192")
     plt.show()
     '''
 
@@ -557,6 +558,7 @@ if __name__ == "__main__":
     #plt.scatter(vertices[0, trace], vertices[1, trace], s=1)
     plt.axis("equal")
     plt.show()
+    '''
     '''
     ax = plt.figure().add_subplot()
     r = .95

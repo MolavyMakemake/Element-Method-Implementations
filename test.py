@@ -1,49 +1,54 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from hyperbolic.Integrator import Integrator
+from hyperbolic.triangulate import save
 
-_int = Integrator(100)
+def distance(x, y):
+    #return np.sqrt((x - y) @ (x - y))
 
-f = lambda x, y: x * np.power((1 - y*y) / ((1 - x*x) * (1 - x*x - y*y)), .25)
-g = lambda x, y: y * np.power((1 - x*x) / ((1 - y*y) * (1 - x*x - y*y)), .25)
+    _d = 2 * (x - y) @ (x - y) / ((1 - x @ x) * (1 - y @ y))
+    return np.arccosh(1 + _d)
 
-v1 = np.array([.5, -.2])
-v2 = np.array([.4, .7])
-v3 = np.array([-.5, -.5])
+vertices = []
+triangles = []
+file = open("./meshgen/output/triangulation_hyp_512(131).txt")
+exec(file.read())
+vertices = np.array(vertices).reshape((len(vertices) // 2, 2)).T
+file.close()
 
+R = np.tanh(1.5)
+boundary = []
+for i in range(np.size(vertices, axis=1)):
+    if np.dot(vertices[:, i], vertices[:, i]) > R * R - 1e-5:
+        boundary.append(i)
 
-A = np.array([
-    [f(v2[0], v2[1]), g(v2[0], v2[1]), 1],
-    [f(0, 0), g(0, 0), 1],
-    [f(v1[0], v1[1]), g(v1[0], v1[1]), 1]
-])
-a = np.linalg.solve(A, np.array([1, 0, 0]))
+    #vertices[:, i] *= R
 
-B = np.array([
-    [f(v2[0], v2[1]), g(v2[0], v2[1]), 1],
-    [f(v3[0], v3[1]), g(v3[0], v3[1]), 1],
-    [f(0, 0), g(0, 0), 1]
-])
-b = np.linalg.solve(B, np.array([1, 0, 0]))
+_triangles = []
+for i in range(0, len(triangles), 3):
+    _triangles.append([triangles[i], triangles[i + 1], triangles[i + 2]])
 
-t = np.linspace(0, 1)
-X = t * v2[0]
-Y = t * v2[1]
+print(len(_triangles))
 
-plt.plot(t, a[0] * f(X, Y) + a[1] * g(X, Y) + a[2])
-plt.plot(t, b[0] * f(X, Y) + b[1] * g(X, Y) + b[2])
-plt.show()
+H = []
+for p_i in _triangles:
+    H.append(max([
+        distance(vertices[:, p_i[0]], vertices[:, p_i[1]]),
+        distance(vertices[:, p_i[1]], vertices[:, p_i[2]]),
+        distance(vertices[:, p_i[2]], vertices[:, p_i[0]])
+    ]))
 
-X0 = _int.vertices[0, :]
-Y0 = _int.vertices[1, :]
+N = len(H)
 
-X = v2[0] * X0 + v3[0] * Y0
-Y = v2[1] * X0 + v3[1] * Y0
+h0 = np.min(H)
+w = 0.005
 
-fig = plt.figure()
-ax = plt.axes(projection='3d')
-ax.set_xlabel("x")
-ax.set_ylabel("y")
-ax.scatter(X, Y, b[0] * f(X, Y) + b[1] * g(X, Y) + b[2], s=.4)
-ax.legend()
+buckets = np.arange(h0, np.max(H), w)
+distribution = np.zeros_like(buckets)
+
+s = 1.0 / N
+for h in H:
+    i = int((h - h0) / w)
+    distribution[i] += s
+
+plt.bar(buckets, distribution, width=w, align="edge")
 plt.show()
