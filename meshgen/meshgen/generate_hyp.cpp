@@ -31,6 +31,49 @@ namespace {
         return vertices;
     }
 
+    std::vector<double> square(int N_vertices, int N_boundary, double radius) {
+        std::vector<double> vertices;
+
+        N_boundary = std::min(N_vertices, N_boundary);
+        vertices.reserve(2 * (N_vertices * N_vertices + 4 * N_boundary));
+
+        double r = glm::tanh(radius);
+
+        double d = 2.0 * r / (N_vertices + 1.0);
+        for (int i = 0; i < N_vertices * N_vertices; i++) {
+            int x = i % N_vertices;
+            int y = i / N_vertices;
+            vertices.push_back(-r + d * (x + 1.0));
+            vertices.push_back(-r + d * (y + 1.0));
+        }
+
+        d = 2.0 * r / N_boundary;
+        for (int i = 0; i < N_boundary; i++) {
+            vertices.push_back(r);
+            vertices.push_back(-r + d * i);
+
+            vertices.push_back(r - d * i);
+            vertices.push_back(r);
+
+            vertices.push_back(-r);
+            vertices.push_back(r - d * i);
+
+            vertices.push_back(-r + d * i);
+            vertices.push_back(-r);
+        }
+
+        for (int i = 0; i < vertices.size(); i += 2) {
+            double x0 = vertices[i + 0];
+            double x1 = vertices[i + 1];
+            double t = 1.0 + glm::sqrt(1.0 - x0 * x0 - x1 * x1);
+
+            vertices[i + 0] = x0 / t;
+            vertices[i + 1] = x1 / t;
+        }
+
+        return vertices;
+    }
+
     // Requires x, y to be fixed for correct comparisons
     double voronoi_magnitude(double x0, double y0, double x, double y) {
         double dx = x0 - x;
@@ -118,6 +161,43 @@ triangulation_t disk_hyp(int N_vertices, int N_boundary, double radius, int N_it
     Integrator integrator(integral_resolution);
     for (int i = 0; i < N_iterations; i++) {
         iterate(triangulation, radius, integrator, true);
+    }
+
+    return triangulation;
+}
+
+void cull_triangulation(triangulation_t& triangulation) {
+    size_t i = 0;
+    size_t N = triangulation.N_vertices - triangulation.N_boundary;
+
+    for (std::vector<size_t>::iterator it = triangulation.triangles.begin();
+        it != triangulation.triangles.end();) {
+
+        if (*(it + 0) >= N &&
+            *(it + 1) >= N &&
+            *(it + 2) >= N)
+        {
+            it = triangulation.triangles.erase(it, it + 3);
+        }
+        else
+            it += 3;
+    }
+}
+
+triangulation_t square_hyp(int N_vertices, int N_boundary, double radius, int N_iterations, int integral_resolution) {
+    triangulation_t triangulation;
+    triangulation.vertices = square(N_vertices, N_boundary, radius);
+    triangulation.N_vertices = N_vertices * N_vertices + 4 * N_boundary;
+    triangulation.N_boundary = 4 * N_boundary;
+
+    delaunator::Delaunator d(triangulation.vertices);
+    triangulation.triangles = d.triangles;
+    cull_triangulation(triangulation);
+
+    Integrator integrator(integral_resolution);
+    for (int i = 0; i < N_iterations; i++) {
+        iterate(triangulation, radius, integrator);
+        cull_triangulation(triangulation);
     }
 
     return triangulation;

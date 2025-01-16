@@ -12,8 +12,7 @@ models = (
     FEM_STAUDTIAN_O1.Model(vertices_k, triangles, boundary),
     FEM_SIMPLEX_O1.Model(vertices_p, triangles, boundary)
 )
-
-#print(models[0].area())
+print(models[0].area())
 #print(models[1].area())
 
 f = (

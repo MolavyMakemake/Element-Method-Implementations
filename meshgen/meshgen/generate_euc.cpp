@@ -29,6 +29,38 @@ namespace {
         return vertices;
     }
 
+    std::vector<double> square(int N_vertices, int N_boundary, double radius) {
+        std::vector<double> vertices;
+
+        N_boundary = std::min(N_vertices, N_boundary);
+        vertices.reserve(2 * (N_vertices * N_vertices + 4 * N_boundary));
+
+        double d = 2.0 * radius / (N_vertices + 1.0);
+        for (int i = 0; i < N_vertices * N_vertices; i++) {
+            int x = i % N_vertices;
+            int y = i / N_vertices;
+            vertices.push_back(-radius + d * (x + 1.0));
+            vertices.push_back(-radius + d * (y + 1.0));
+        }
+
+        d = 2.0 * radius / N_boundary;
+        for (int i = 0; i < N_boundary; i++) {
+            vertices.push_back(radius);
+            vertices.push_back(-radius + d * i);
+
+            vertices.push_back(radius - d * i);
+            vertices.push_back(radius);
+
+            vertices.push_back(-radius);
+            vertices.push_back(radius - d * i);
+
+            vertices.push_back(-radius + d * i);
+            vertices.push_back(-radius);
+        }
+
+        return vertices;
+    }
+
     double magnitude(double x0, double y0, double x, double y) {
         double dx = x0 - x;
         double dy = y0 - y;
@@ -107,6 +139,23 @@ namespace {
         triangulation.triangles = d.triangles;
     }
 
+}
+
+triangulation_t square_euc(int N_vertices, int N_boundary, double radius, int N_iterations, int integral_resolution) {
+    triangulation_t triangulation;
+    triangulation.vertices = square(N_vertices, N_boundary, radius);
+    triangulation.N_vertices = N_vertices * N_vertices + 4 * N_boundary;
+    triangulation.N_boundary = 4 * N_boundary;
+
+    delaunator::Delaunator d(triangulation.vertices);
+    triangulation.triangles = d.triangles;
+
+    Integrator integrator(integral_resolution);
+    for (int i = 0; i < N_iterations; i++) {
+        iterate(triangulation, radius, integrator);
+    }
+
+    return triangulation;
 }
 
 triangulation_t disk_euc(int N_vertices, int N_boundary, double radius, int N_iterations, int integral_resolution) {

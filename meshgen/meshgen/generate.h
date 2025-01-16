@@ -34,6 +34,9 @@ analytics_t analytics_hyp(triangulation_t& triangulation);
 triangulation_t disk_euc(int N_vertices, int N_boundary, double radius, int N_iterations, int integral_resolution);
 triangulation_t disk_hyp(int N_vertices, int N_boundary, double radius, int N_iterations, int integral_resolution);
 
+triangulation_t square_euc(int N_vertices, int N_boundary, double radius, int N_iterations, int integral_resolution);
+triangulation_t square_hyp(int N_vertices, int N_boundary, double radius, int N_iterations, int integral_resolution);
+
 inline triangulation_t disk(int N_vertices, int N_boundary, double radius, METRIC_ metric, int N_iterations, int integral_resolution) {
 	switch (metric) {
 	case METRIC_EUCLIDIAN:
@@ -41,6 +44,19 @@ inline triangulation_t disk(int N_vertices, int N_boundary, double radius, METRI
 
 	case METRIC_POINCARE:
 		return disk_hyp(N_vertices, N_boundary, radius, N_iterations, integral_resolution);
+
+	default:
+		throw 0;
+	}
+}
+
+inline triangulation_t square(int N_vertices, int N_boundary, double radius, METRIC_ metric, int N_iterations, int integral_resolution) {
+	switch (metric) {
+	case METRIC_EUCLIDIAN:
+		return square_euc(N_vertices, N_boundary, radius, N_iterations, integral_resolution);
+
+	case METRIC_POINCARE:
+		return square_hyp(N_vertices, N_boundary, radius, N_iterations, integral_resolution);
 
 	default:
 		throw 0;

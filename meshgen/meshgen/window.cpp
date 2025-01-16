@@ -69,12 +69,12 @@ void Window::Run() {
     bool redraw = true;
     bool redist = true;
 
-    int N = 1024;
-    int N_bdry = 6;
+    int N = 100;
+    int N_bdry = 10;
     int N_iterations = 0;
     int integral_resolution = 10;
 
-    float R = 1.0f;
+    float R = .8f;
     bool hyperbolic = false;
 
     triangulation_t triangulation;
@@ -102,14 +102,14 @@ void Window::Run() {
         }
 
         if (redist) {
-            N = std::max<int>(N, 16);
-            N_bdry = std::min<int>(N, N_bdry);
+            N = std::max<int>(N, 8);
+            N_bdry = std::min<int>(N * N, N_bdry);
             if (hyperbolic) {
-                triangulation = disk(N, N_bdry, R, METRIC_POINCARE, N_iterations, integral_resolution);
+                triangulation = square(N, N_bdry, R, METRIC_POINCARE, N_iterations, integral_resolution);
                 analytics = analytics_hyp(triangulation);
             }
             else {
-                triangulation = disk(N, N_bdry, R, METRIC_EUCLIDIAN, N_iterations, integral_resolution);
+                triangulation = square(N, N_bdry, R, METRIC_EUCLIDIAN, N_iterations, integral_resolution);
                 analytics = analytics_euc(triangulation);
             }
 
