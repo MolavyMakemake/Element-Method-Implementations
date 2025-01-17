@@ -34,7 +34,7 @@ namespace {
     std::vector<double> square(int N_vertices, int N_boundary, double radius) {
         std::vector<double> vertices;
 
-        N_boundary = std::min(N_vertices, N_boundary);
+        N_boundary = std::min(N_vertices * N_vertices, N_boundary);
         vertices.reserve(2 * (N_vertices * N_vertices + 4 * N_boundary));
 
         double r = glm::tanh(radius);
@@ -49,16 +49,19 @@ namespace {
 
         d = 2.0 * r / N_boundary;
         for (int i = 0; i < N_boundary; i++) {
-            vertices.push_back(r);
-            vertices.push_back(-r + d * i);
+            double t = 2.0 * i / N_boundary - 1;
+            t = glm::sign(t) * glm::sqrt(glm::abs(t));
 
-            vertices.push_back(r - d * i);
+            vertices.push_back(r);
+            vertices.push_back(t * r);
+
+            vertices.push_back(-t * r);
             vertices.push_back(r);
 
             vertices.push_back(-r);
-            vertices.push_back(r - d * i);
+            vertices.push_back(-t * r);
 
-            vertices.push_back(-r + d * i);
+            vertices.push_back(t * r);
             vertices.push_back(-r);
         }
 
@@ -141,6 +144,42 @@ namespace {
             triangulation.vertices[2 * i + 1] = vertices[2 * i + 1] / area[i];
         }
 
+        // Only applies to rect
+        /*
+        double R = glm::tanh(radius / 2.0);
+        
+        double S0 = 0.5 * (R + 1.0 / R); // Compute the geodesic circle
+        double R0 = S0 - R;
+
+        for (size_t i = triangulation.N_vertices - triangulation.N_boundary + 8; i < triangulation.N_vertices; i += 8) {
+            double x, y, t;
+    
+            x = vertices[2 * i + 0] / area[i] - S0;
+            y = vertices[2 * i + 1] / area[i];
+            t = R0 / glm::sqrt(x * x + y * y);
+            triangulation.vertices[2 * i + 0] = S0 + x * t;
+            triangulation.vertices[2 * i + 1] = y * t;
+
+            x = vertices[2 * i + 2] / area[i];
+            y = vertices[2 * i + 3] / area[i] - S0;
+            t = R0 / glm::sqrt(x * x + y * y);
+            triangulation.vertices[2 * i + 2] = x * t;
+            triangulation.vertices[2 * i + 3] = S0 + y * t;
+
+            x = vertices[2 * i + 4] / area[i] + S0;
+            y = vertices[2 * i + 5] / area[i];
+            t = R0 / glm::sqrt(x * x + y * y);
+            triangulation.vertices[2 * i + 4] = -S0 + x * t;
+            triangulation.vertices[2 * i + 5] = y * t;
+
+            x = vertices[2 * i + 6] / area[i];
+            y = vertices[2 * i + 7] / area[i] + S0;
+            t = R0 / glm::sqrt(x * x + y * y);
+            triangulation.vertices[2 * i + 6] = x * t;
+            triangulation.vertices[2 * i + 7] = -S0 + y * t;
+        }*/
+        //
+
         if (retriangulate) {
             delaunator::Delaunator d(triangulation.vertices);
             triangulation.triangles = d.triangles;
@@ -166,6 +205,15 @@ triangulation_t disk_hyp(int N_vertices, int N_boundary, double radius, int N_it
     return triangulation;
 }
 
+char cull_bm(int i) {
+    char bm = 0x00;
+    bm |= (i % 4 == 0 || i == 1) * 0x01;
+    bm |= (i % 4 == 1 || i == 2) * 0x02;
+    bm |= (i % 4 == 2 || i == 3) * 0x04;
+    bm |= (i % 4 == 3 || i == 0) * 0x08;
+    return (i >= 0) * bm;
+}
+
 void cull_triangulation(triangulation_t& triangulation) {
     size_t i = 0;
     size_t N = triangulation.N_vertices - triangulation.N_boundary;
@@ -173,9 +221,11 @@ void cull_triangulation(triangulation_t& triangulation) {
     for (std::vector<size_t>::iterator it = triangulation.triangles.begin();
         it != triangulation.triangles.end();) {
 
-        if (*(it + 0) >= N &&
-            *(it + 1) >= N &&
-            *(it + 2) >= N)
+        size_t bm0 = cull_bm((int)*(it + 0) - N);
+        size_t bm1 = cull_bm((int)*(it + 1) - N);
+        size_t bm2 = cull_bm((int)*(it + 2) - N);
+
+        if (bm0 & bm1 & bm2)
         {
             it = triangulation.triangles.erase(it, it + 3);
         }

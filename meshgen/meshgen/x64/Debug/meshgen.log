@@ -1,2 +1,5 @@
 ﻿  generate_hyp.cpp
+D:\Users\47452\source\Element-Method-Implementations\meshgen\meshgen\generate_hyp.cpp(224,48): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+D:\Users\47452\source\Element-Method-Implementations\meshgen\meshgen\generate_hyp.cpp(225,48): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+D:\Users\47452\source\Element-Method-Implementations\meshgen\meshgen\generate_hyp.cpp(226,48): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
   meshgen.vcxproj -> D:\Users\47452\source\Element-Method-Implementations\meshgen\x64\Debug\meshgen.exe

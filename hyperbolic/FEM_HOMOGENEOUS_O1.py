@@ -262,8 +262,8 @@ class Model:
 
             v = self.vertices[:, [i0, i1, i2]]
             w = klein_to_hyperboloid(v)
-            w = translate(barycenter(v)) @ w
-            v = hyperboloid_to_klein(w)
+            T = translate(barycenter(v))
+            v = hyperboloid_to_klein(T @ w)
 
             A = np.array([
                 v[:, 1] - v[:, 0],
@@ -273,12 +273,14 @@ class Model:
             Jac_F = np.abs(A[0, 0] * A[1, 1] - A[1, 0] * A[0, 1])
 
             X = F(self._integrator.vertices)
+            Y = klein_to_hyperboloid(X)
+            Y = hyperboloid_to_klein(np.linalg.inv(T) @ Y)
 
             V0, DV0 = _V(X, v)
             V1, DV1 = _V(X, np.roll(v, 1, axis=1))
             V2, DV2 = _V(X, np.roll(v, 2, axis=1))
 
-            _f_dv = f(X[0, :] + 1j * X[1, :]) * _dVol_K(X)
+            _f_dv = f(Y[0, :] + 1j * Y[1, :]) * _dVol_K(X)
 
             e0, e1, e2 = self._elements[[i0, i1, i2]]
             if self._mask[i0]:

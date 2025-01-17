@@ -45,24 +45,18 @@ def angles(x0, x1, x2):
 
 vertices = []
 triangles = []
-file = open("../meshgen/output/triangulation_hyp_512(131).txt")
+file = open("../meshgen/output/triangulation_rect_hyp_180(80).txt")
 exec(file.read())
 vertices = np.array(vertices).reshape((len(vertices) // 2, 2)).T
 file.close()
 
 R = np.tanh(1.5)
-boundary = []
-for i in range(np.size(vertices, axis=1)):
-    if np.dot(vertices[:, i], vertices[:, i]) > R * R - 1e-5:
-        boundary.append(i)
-
-    #vertices[:, i] *= R
-
+boundary = [i for i in range(100, np.size(vertices, axis=1), 1)]
 _triangles = []
 for i in range(0, len(triangles), 3):
     _triangles.append([triangles[i], triangles[i + 1], triangles[i + 2]])
 
-save(vertices, _triangles, boundary, "uniform_disk_hyp_512")
+save(vertices, _triangles, boundary, "uniform_rect_180")
 
 H = []
 T = []

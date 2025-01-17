@@ -69,13 +69,13 @@ void Window::Run() {
     bool redraw = true;
     bool redist = true;
 
-    int N = 100;
-    int N_bdry = 10;
+    int N = 30;
+    int N_bdry = 30;
     int N_iterations = 0;
     int integral_resolution = 10;
 
-    float R = .8f;
-    bool hyperbolic = false;
+    float R = .86f;
+    bool hyperbolic = true;
 
     triangulation_t triangulation;
     analytics_t analytics;
@@ -104,6 +104,7 @@ void Window::Run() {
         if (redist) {
             N = std::max<int>(N, 8);
             N_bdry = std::min<int>(N * N, N_bdry);
+            R = std::max<double>(1e-1, R);
             if (hyperbolic) {
                 triangulation = square(N, N_bdry, R, METRIC_POINCARE, N_iterations, integral_resolution);
                 analytics = analytics_hyp(triangulation);
@@ -200,7 +201,7 @@ void Window::Run() {
         if (ImGui::Button("Save")) {
             std::ofstream file;
             
-            std::string path = "../output/triangulation";
+            std::string path = "../output/triangulation_rect";
             path += hyperbolic ? "_hyp_" : "_euc_";
             path += std::to_string(triangulation.N_vertices);
             path += "(" + std::to_string(triangulation.N_boundary) + ")";

@@ -224,8 +224,8 @@ class Model:
         for i0, i1, i2 in self.polygons:
             v_K = self.vertices[:, [i0, i1, i2]]
             w = klein_to_hyperboloid(v_K)
-            w = translate(barycenter(v_K)) @ w
-            v_K = hyperboloid_to_klein(w)
+            T = translate(barycenter(v_K))
+            v_K = hyperboloid_to_klein(T @ w)
 
             v_D = _Phi_KtD(v_K)
 
@@ -239,11 +239,14 @@ class Model:
             X_K = F(self._integrator.vertices)
             X_D = _Phi_KtD(X_K)
 
+            Y = klein_to_hyperboloid(X_K)
+            Y = hyperboloid_to_klein(np.linalg.inv(T) @ Y)
+
             V0, DV0 = _V(v_D[:, 0], v_D[:, 1], X_D)
             V1, DV1 = _V(v_D[:, 1], v_D[:, 2], X_D)
             V2, DV2 = _V(v_D[:, 2], v_D[:, 0], X_D)
 
-            _f_dv = f(X_D) * _dVol_K(X_K)
+            _f_dv = f(Y[0, :] + 1j * Y[1, :]) * _dVol_K(X_K)
 
             e0, e1, e2 = self._elements[[i0, i1, i2]]
 

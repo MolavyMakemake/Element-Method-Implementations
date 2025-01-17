@@ -23,27 +23,27 @@ def compute_h(vertices, polygons):
 
 R = np.tanh(1.5)
 R_k = np.tanh(3.0)
-W = R / np.sqrt(2)
+W = np.tanh(.86)
+W2 = W * W
 
-'''
 def v(z):
-    return -np.log(1 - z * np.conj(z))
-
     x2 = np.real(z) * np.real(z)
     y2 = np.imag(z) * np.imag(z)
-    return .5 * (W * W - np.maximum(x2, y2))
+    return (W2 - x2) * (W2 - y2)
 def f(z):
-    return 1
     x2 = np.real(z) * np.real(z)
     y2 = np.imag(z) * np.imag(z)
-    a = np.maximum(x2, y2)
-    b = np.minimum(x2, y2)
-    return 3 * a*a + 3 * a*b - 4 * b + 1
-'''
+    L = -2 * x2 * (1 - x2) * (W2 - y2) + 2 * x2 * y2 * (W2 - x2) \
+        -2 * y2 * (1 - y2) * (W2 - x2) + 2 * x2 * y2 * (W2 - y2) \
+        + (1 - x2 - y2) * (
+        -2 * (1 - x2) * (W2 - y2) + 4 * x2 * (W2 - y2) + 2 * y2 * (W2 - x2) - 4 * x2 * y2
+        -2 * (1 - y2) * (W2 - x2) + 4 * y2 * (W2 - x2) + 2 * x2 * (W2 - y2) - 4 * x2 * y2
+        )
+    return -L
 
 g0 = lambda t: -np.log(1 - t)
 c = g0(R * R)
-v = lambda z: c - g0(z * np.conj(z))
+#v = lambda z: c - g0(z * np.conj(z))
 
 #v = lambda z: R * R - z * np.conj(z)
 #f = lambda z: np.power(1 - z * np.conj(z), 2)
@@ -51,10 +51,10 @@ v = lambda z: c - g0(z * np.conj(z))
 v_k = lambda z: v(z / (1 + np.sqrt(1 - z * np.conj(z))))
 f_p = lambda z: v(2 * z / (1 + z * np.conj(z)))
 
-f = lambda z: 1
+#f = lambda z: 1
 
-V = [v_k, v_k, v_k]
-F = [f, f, f]
+V = [v, v, v, v, v]
+F = [f, f, f, f, f]
 
 H_dof = [[] for _ in range(len(F))]
 H_g = [[] for _ in range(len(F))]
@@ -67,12 +67,12 @@ Y_g = [[] for _ in range(len(F))]
 #                        "../meshgen/output/triangulation_euc_2048(144).txt",
 #                        "../meshgen/output/triangulation_euc_4096(230).txt",
 #                        "../meshgen/output/triangulation_euc_8192(288).txt"]:
-for triangulation_f in ["../meshgen/output/triangulation_hyp_256(110).txt",
-                        "../meshgen/output/triangulation_hyp_512(131).txt",
-                        "../meshgen/output/triangulation_hyp_1024(209).txt",
-                        "../meshgen/output/triangulation_hyp_2048(288).txt",
-                        "../meshgen/output/triangulation_hyp_4096(377).txt",
-                        "../meshgen/output/triangulation_hyp_8192(610).txt"]:
+
+_bdry_N = [100, 400, 900]
+_bdry_i = 0
+for triangulation_f in ["../meshgen/output/triangulation_rect_hyp_180(80).txt",
+                        "../meshgen/output/triangulation_rect_hyp_560(160).txt",
+                        "../meshgen/output/triangulation_rect_hyp_1100(200).txt"]:
 
     vertices = []
     triangles = []
@@ -81,11 +81,8 @@ for triangulation_f in ["../meshgen/output/triangulation_hyp_256(110).txt",
     vertices = np.array(vertices).reshape((len(vertices) // 2, 2)).T
     file.close()
 
-    boundary = []
-    for i in range(np.size(vertices, axis=1)):
-        if np.dot(vertices[:, i], vertices[:, i]) > R * R - 1e-5:
-            boundary.append(i)
-
+    boundary = [i for i in range(_bdry_N[_bdry_i], np.size(vertices, axis=1), 1)]
+    _bdry_i += 1
 
     vertices_k = triangulate._pdisk_to_bkdisk(vertices)
     _triangles = []
@@ -93,9 +90,11 @@ for triangulation_f in ["../meshgen/output/triangulation_hyp_256(110).txt",
         _triangles.append([triangles[i], triangles[i + 1], triangles[i + 2]])
 
     models = [
-        FEM_SIMPLEX_O1.Model(vertices_k, _triangles, boundary, int_res=150),
-        FEM_STAUDTIAN_O1.Model(vertices_k, _triangles, boundary, int_res=150),
-        FEM_HOMOGENEOUS_O1.Model(vertices_k, _triangles, boundary, int_res=150)
+        FEM_SIMPLEX_O1.Model(vertices_k, _triangles, boundary, int_res=100),
+        FEM_STAUDTIAN_O1.Model(vertices_k, _triangles, boundary, int_res=100),
+        FEM_HOMOGENEOUS_O1.Model(vertices_k, _triangles, boundary, int_res=100),
+        FEM_BKDISK_O1.Model(vertices_k, _triangles, boundary),
+        FEM_BKDISK_O2.Model(vertices_k, _triangles, boundary)
     ]
 
     h = compute_h(vertices, _triangles)
@@ -118,8 +117,10 @@ for y in Y_g:
 if True:
 
     plt.loglog(H_dof[0], Y_g[0], "o--", color="black", label="Simplex k=1")
-    plt.loglog(H_dof[1], Y_g[1], "<--", color="black", label="Staudtian k=2")
+    plt.loglog(H_dof[1], Y_g[1], "<--", color="black", label="Staudtian k=1")
     plt.loglog(H_dof[2], Y_g[2], "x--", color="gray", label="Homogeneous k=1")
+    plt.loglog(H_dof[3], Y_g[3], "o--", color="black", label="Klein k=1")
+    plt.loglog(H_dof[4], Y_g[4], "o--", color="black", label="Klein k=2")
     plt.ylabel("Relative error (hyperbolic metric)")
     plt.xlabel("# DOF")
     plt.legend()
@@ -128,6 +129,8 @@ if True:
     plt.loglog(H_g[0], Y_g[0], "o--", color="black", label="Simplex k=1")
     plt.loglog(H_g[1], Y_g[1], "<--", color="black", label="Staudtian k=1")
     plt.loglog(H_g[2], Y_g[2], "x--", color="gray", label="Homogeneous k=1")
+    plt.loglog(H_g[3], Y_g[3], "o--", color="black", label="Klein k=1")
+    plt.loglog(H_g[4], Y_g[4], "o--", color="black", label="Klein k=2")
     plt.ylabel("Relative error (hyperbolic metric)")
     plt.xlabel("Mesh size (hyperbolic metric)")
     plt.legend()

@@ -10,7 +10,7 @@ def distance(x, y):
 
 vertices = []
 triangles = []
-file = open("./meshgen/output/triangulation_hyp_512(131).txt")
+file = open("./meshgen/output/triangulation_rect_hyp_180(80).txt")
 exec(file.read())
 vertices = np.array(vertices).reshape((len(vertices) // 2, 2)).T
 file.close()
