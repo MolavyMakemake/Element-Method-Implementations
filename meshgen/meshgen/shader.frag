@@ -19,7 +19,7 @@ void main()
 	vec3 dx = vec3(h.x, 0, u_px - u_nx);
 	vec3 dy = vec3(0, h.y, u_py - u_ny);
 	vec3 n = normalize(cross(dx, dy));
-
+	
 	FragColor = vec4(n, 1);
 	//FragColor = texture(img, texCoord);
 }
