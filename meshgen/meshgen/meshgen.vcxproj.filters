@@ -60,6 +60,18 @@
     <ClCompile Include="Framebuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="generate_euc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="integrate.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="generate_hyp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Mesh.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="imgui.ini" />
@@ -509,6 +521,9 @@
     <None Include="voronoi_euc.frag" />
     <None Include="voronoi.vert" />
     <None Include="voronoi_hyp.frag" />
+    <None Include="wireframe.frag" />
+    <None Include="wireframe.vert" />
+    <None Include="iterate_euc.comp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Libraries\include\assimp\Compiler\poppack1.h">
@@ -1670,6 +1685,18 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Framebuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="generate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="integrate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Libraries\include\delaunator.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Mesh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

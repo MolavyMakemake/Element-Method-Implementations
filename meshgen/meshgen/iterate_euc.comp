@@ -1,0 +1,26 @@
+#version 430 core
+
+const uint N = 8192; // maximum number of vertices
+
+layout (local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
+layout (std430, binding = 2) buffer ssbo 
+{
+	double vertices[N];
+	uint triangles[2 * N];
+	uint neighbor_lookup[8 * N];
+	uint lookup_index[N];
+	uint lookup_stride[N];
+};
+
+uniform uint N_vertices;
+uniform uint N_boundary;
+uniform uint N_triangles;
+
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+
+	for (uint l = 0; l < lookup_stride[i]; l++) {
+		uint I = lookup_index[l];
+
+	}
+}
