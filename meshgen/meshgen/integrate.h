@@ -16,6 +16,8 @@ public:
 		std::vector<double>* samples, std::vector<double>* weights);
 	void sample_hyp(double x0, double y0, double x1, double y1, double x2, double y2, 
 		std::vector<double>* samples, std::vector<double>* weights);
+	void sample_hypsphere(double x0, double y0, double x1, double y1, double x2, double y2, double R,
+		std::vector<double>* samples, std::vector<double>* weights);
 
 	inline void sample_euc(std::vector<double>* vertices, size_t i0, size_t i1, size_t i2, 
 		std::vector<double>* samples, std::vector<double>* weights) {
@@ -33,6 +35,15 @@ public:
 			(*vertices)[2 * i1 + 0], (*vertices)[2 * i1 + 1],
 			(*vertices)[2 * i2 + 0], (*vertices)[2 * i2 + 1],
 			samples, weights);
+	}
+
+	inline void sample_hypsphere(std::vector<double>* vertices, size_t i0, size_t i1, size_t i2, double R,
+		std::vector<double>* samples, std::vector<double>* weights) {
+		return sample_hypsphere(
+			(*vertices)[2 * i0 + 0], (*vertices)[2 * i0 + 1],
+			(*vertices)[2 * i1 + 0], (*vertices)[2 * i1 + 1],
+			(*vertices)[2 * i2 + 0], (*vertices)[2 * i2 + 1],
+			R, samples, weights);
 	}
 
 private:

@@ -31,6 +31,34 @@ namespace {
         return vertices;
     }
 
+    std::vector<double> sphere(int N_vertices, int N_boundary, double radius) {
+        std::vector<double> vertices;
+        vertices.reserve(2 * N_vertices);
+
+        N_boundary = std::min(N_vertices, N_boundary);
+        double arg = glm::pi<double>() * (3 - glm::sqrt(5));
+
+        double R = glm::tanh(radius / 2);
+        double t = 0;
+        for (int i = 0; i < N_vertices - N_boundary; i++) {
+            double x = (float)i / (N_vertices - .5f * N_boundary);
+            double r = glm::sqrt(x * (2 - x)) * R;
+
+            vertices.push_back(r * glm::cos(t));
+            vertices.push_back(r * glm::sin(t));
+            t += arg;
+        }
+
+        arg = 2 * glm::pi<double>() / N_boundary;
+        for (int i = N_vertices - N_boundary; i < N_vertices; i++) {
+            vertices.push_back(R * glm::cos(t));
+            vertices.push_back(R * glm::sin(t));
+            t += arg;
+        }
+
+        return vertices;
+    }
+
     std::vector<double> square(int N_vertices, int N_boundary, double radius) {
         std::vector<double> vertices;
 
@@ -144,53 +172,93 @@ namespace {
             triangulation.vertices[2 * i + 1] = vertices[2 * i + 1] / area[i];
         }
 
-        // Only applies to rect
-        /*
-        double R = glm::tanh(radius / 2.0);
-        
-        double S0 = 0.5 * (R + 1.0 / R); // Compute the geodesic circle
-        double R0 = S0 - R;
-
-        for (size_t i = triangulation.N_vertices - triangulation.N_boundary + 8; i < triangulation.N_vertices; i += 8) {
-            double x, y, t;
-    
-            x = vertices[2 * i + 0] / area[i] - S0;
-            y = vertices[2 * i + 1] / area[i];
-            t = R0 / glm::sqrt(x * x + y * y);
-            triangulation.vertices[2 * i + 0] = S0 + x * t;
-            triangulation.vertices[2 * i + 1] = y * t;
-
-            x = vertices[2 * i + 2] / area[i];
-            y = vertices[2 * i + 3] / area[i] - S0;
-            t = R0 / glm::sqrt(x * x + y * y);
-            triangulation.vertices[2 * i + 2] = x * t;
-            triangulation.vertices[2 * i + 3] = S0 + y * t;
-
-            x = vertices[2 * i + 4] / area[i] + S0;
-            y = vertices[2 * i + 5] / area[i];
-            t = R0 / glm::sqrt(x * x + y * y);
-            triangulation.vertices[2 * i + 4] = -S0 + x * t;
-            triangulation.vertices[2 * i + 5] = y * t;
-
-            x = vertices[2 * i + 6] / area[i];
-            y = vertices[2 * i + 7] / area[i] + S0;
-            t = R0 / glm::sqrt(x * x + y * y);
-            triangulation.vertices[2 * i + 6] = x * t;
-            triangulation.vertices[2 * i + 7] = -S0 + y * t;
-        }*/
-        //
-
         if (retriangulate) {
             delaunator::Delaunator d(triangulation.vertices);
             triangulation.triangles = d.triangles;
         }
     }
 
+    double sphere_voronoi_magnitude(double R, double x0, double y0, double x, double y) {
+        double dx = x0 - x;
+        double dy = y0 - y;
+        return (dx * dx + dy * dy) / (1 - x0 * x0 - y0 * y0);
+    }
+
+    size_t sphere_voronoi_index(std::vector<double>& vertices, double R, size_t i0, size_t i1, size_t i2, double x, double y) {
+
+        double dst = sphere_voronoi_magnitude(R, vertices[2 * i0 + 0], vertices[2 * i0 + 1], x, y);
+        double _dst = sphere_voronoi_magnitude(R, vertices[2 * i1 + 0], vertices[2 * i1 + 1], x, y);
+
+        size_t j = _dst < dst ? i1 : i0;
+        dst = std::min<double>(dst, _dst);
+
+        return sphere_voronoi_magnitude(R, vertices[2 * i2 + 0], vertices[2 * i2 + 1], x, y) < dst ? i2 : j;
+    }
+
+    void iterate_sphere(triangulation_t& triangulation, double radius, Integrator& integrator, bool retriangulate = true) {
+        std::vector<double> vertices;
+        std::vector<double> area;
+
+        vertices.assign(2 * triangulation.N_vertices, 0);
+        area.assign(triangulation.N_vertices, 0);
+
+        double R = glm::tanh(radius / 2.0);
+
+        std::vector<double> samples;
+        std::vector<double> weights;
+        for (size_t I = 0; I < triangulation.triangles.size(); I += 3) {
+            size_t i0 = triangulation.triangles[I + 0];
+            size_t i1 = triangulation.triangles[I + 1];
+            size_t i2 = triangulation.triangles[I + 2];
+
+            samples.clear();
+            weights.clear();
+            integrator.sample_hypsphere(&triangulation.vertices, i0, i1, i2, R, &samples, &weights);
+            for (size_t j = 0; j < integrator.N_vertices; j++) {
+                double x = samples[2 * j + 0];
+                double y = samples[2 * j + 1];
+
+                size_t k = sphere_voronoi_index(triangulation.vertices, R, i0, i1, i2, x, y);
+
+                vertices[2 * k + 0] += x * weights[j];
+                vertices[2 * k + 1] += y * weights[j];
+
+                area[k] += weights[j];
+            }
+        }
+
+        for (size_t i = 0; i < triangulation.N_vertices - triangulation.N_boundary; i++) {
+            triangulation.vertices[2 * i + 0] = vertices[2 * i + 0] / area[i];
+            triangulation.vertices[2 * i + 1] = vertices[2 * i + 1] / area[i];
+        }
+
+        if (retriangulate) {
+            delaunator::Delaunator d(triangulation.vertices);
+            triangulation.triangles = d.triangles;
+        }
+    }
 }
 
 triangulation_t disk_hyp(int N_vertices, int N_boundary, double radius, int N_iterations, int integral_resolution) {
     triangulation_t triangulation;
     triangulation.vertices = fibonacci(N_vertices, N_boundary, radius);
+    triangulation.N_vertices = N_vertices;
+    triangulation.N_boundary = N_boundary;
+
+    delaunator::Delaunator d(triangulation.vertices);
+    triangulation.triangles = d.triangles;
+
+    Integrator integrator(integral_resolution);
+    for (int i = 0; i < N_iterations; i++) {
+        iterate(triangulation, radius, integrator, true);
+    }
+
+    return triangulation;
+}
+
+triangulation_t sphere_hyp(int N_vertices, int N_boundary, double radius, int N_iterations, int integral_resolution) {
+    triangulation_t triangulation;
+    triangulation.vertices = sphere(N_vertices, N_boundary, radius);
     triangulation.N_vertices = N_vertices;
     triangulation.N_boundary = N_boundary;
 

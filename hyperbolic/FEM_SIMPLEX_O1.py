@@ -5,7 +5,7 @@ from Integrator import Integrator
 from hyperbolic import triangulate, plot
 
 def _dVol(x, y):
-    return np.power(.5 * (1 - x * x - y * y), -2)
+    return np.power(1 - x * x - y * y, -1.5)
 
 def _dVol_K(x):
     return np.power(1 - np.sum(x * x, axis=0), -1.5)
@@ -63,7 +63,7 @@ def _V(u, v, x):
     Dd2 = (2 * (d2 - 1) * x[0, :] / (1 - x2) + 4 * xv[0, :] / ((1 - x2) * (1 - v @ v)),
            2 * (d2 - 1) * x[1, :] / (1 - x2) + 4 * xv[1, :] / ((1 - x2) * (1 - v @ v)))
 
-    A = 1 - d0 * d0 - d1 * d1 - d2 * d2 + 2 * d0 * d1 * d2
+    A = np.abs(1 - d0 * d0 - d1 * d1 - d2 * d2 + 2 * d0 * d1 * d2)
     B = 1 + d0 + d1 + d2
 
     a1 = -d1 * Dd1[0] - d2 * Dd2[0] + d0 * d1 * Dd2[0] + d0 * Dd1[0] * d2
@@ -109,8 +109,6 @@ class Model:
         self.L = np.array([[]])
         self.M = np.array([[]])
         self._mask = []
-
-        self.k = 10;
 
         self.eigenvectors = []
         self.eigenvalues = []
@@ -168,10 +166,11 @@ class Model:
             X_K = F(self._integrator.vertices)
             X_D = _Phi_KtD(X_K)
 
-            V0, DV0 = _V(v_D[:, 0], v_D[:, 1], X_D)
-            V1, DV1 = _V(v_D[:, 1], v_D[:, 2], X_D)
-            V2, DV2 = _V(v_D[:, 2], v_D[:, 0], X_D)
+            V0, DV0 = _V(v_D[:, 1], v_D[:, 2], X_D)
+            V1, DV1 = _V(v_D[:, 2], v_D[:, 0], X_D)
+            V2, DV2 = _V(v_D[:, 0], v_D[:, 1], X_D)
             dv = np.square(1 - np.sum(X_D * X_D, axis=0)) * _dVol_K(X_K) / 4.0
+
             e0, e1, e2 = self._elements[i0], self._elements[i1], self._elements[i2]
 
             if self._mask[i0]:
@@ -242,13 +241,13 @@ class Model:
             Y = klein_to_hyperboloid(X_K)
             Y = hyperboloid_to_klein(np.linalg.inv(T) @ Y)
 
-            V0, DV0 = _V(v_D[:, 0], v_D[:, 1], X_D)
-            V1, DV1 = _V(v_D[:, 1], v_D[:, 2], X_D)
-            V2, DV2 = _V(v_D[:, 2], v_D[:, 0], X_D)
+            V0, DV0 = _V(v_D[:, 1], v_D[:, 2], X_D)
+            V1, DV1 = _V(v_D[:, 2], v_D[:, 0], X_D)
+            V2, DV2 = _V(v_D[:, 0], v_D[:, 1], X_D)
 
             _f_dv = f(Y[0, :] + 1j * Y[1, :]) * _dVol_K(X_K)
 
-            e0, e1, e2 = self._elements[[i0, i1, i2]]
+            e0, e1, e2 = self._elements[i0], self._elements[i1], self._elements[i2]
 
             if self._mask[i0]:
                 b[e0] += Jac_F * self._integrator.integrate_vector(
@@ -328,9 +327,9 @@ class Model:
 
             X_D = _Phi_KtD(X)
 
-            V0, DV0 = _V(v_D[:, 0], v_D[:, 1], X_D)
-            V1, DV1 = _V(v_D[:, 1], v_D[:, 2], X_D)
-            V2, DV2 = _V(v_D[:, 2], v_D[:, 0], X_D)
+            V0, DV0 = _V(v_D[:, 1], v_D[:, 2], X_D)
+            V1, DV1 = _V(v_D[:, 2], v_D[:, 0], X_D)
+            V2, DV2 = _V(v_D[:, 0], v_D[:, 1], X_D)
 
             e = self._solution[self._elements[[i0, i1, i2]]]
             e[np.logical_not(self._mask[[i0, i1, i2]])] = 0

@@ -14,8 +14,8 @@ def klein_to_poincare(x):
     return x / (1 + np.sqrt(1 - np.sum(x * x, axis=0)))
 
 def klein_to_hyperboloid(x):
-    t = 1 / np.sqrt(1 - np.sum(x*x, axis=0))
-    return np.concatenate((t[np.newaxis, :], t * x))
+    return np.concatenate((np.ones_like(x[0, :])[np.newaxis, :], x)) \
+        / np.sqrt(1 - np.sum(x*x, axis=0))
 
 _BC_INTEGRATOR = Integrator(20)
 def barycenter(v):
@@ -60,9 +60,9 @@ def shift(a):
     ])
 
 def orthomap(a):
-    A = translate(a[:, 0])
-    A = rotate(A @ a[:, 1]) @ A
-    return shift(A @ a[:, 2]) @ A
+    A = translate(a[:, 1])
+    A = rotate(A @ a[:, 2]) @ A
+    return shift(A @ a[:, 0]) @ A
 
 def Jac_klein_to_hyperboloid(x, u):
     r = x * x
@@ -130,7 +130,7 @@ class Model:
         self._identify = [[], []]
         self._elements = []
 
-        self._integrator = Integrator(int_res, open=False)
+        self._integrator = Integrator(int_res)
 
         self.vertices = vertices
         self.polygons = triangles
@@ -179,9 +179,7 @@ class Model:
         self._n_elements = n
 
         L = np.zeros([n, n])
-        i = 0
         for i0, i1, i2 in self.polygons:
-            i += 1
 
             v = self.vertices[:, [i0, i1, i2]]
             w = klein_to_hyperboloid(v)
@@ -192,20 +190,19 @@ class Model:
                 v[:, 1] - v[:, 0],
                 v[:, 2] - v[:, 0]
             ]).T
-            F = lambda x: v[:, 0, np.newaxis] + A @ x
             Jac_F = np.abs(A[0, 0] * A[1, 1] - A[1, 0] * A[0, 1])
 
-            X = F(self._integrator.vertices)
+            X = v[:, 0, np.newaxis] + A @ self._integrator.vertices
 
             V0, DV0 = _V(X, v)
-            V1, DV1 = _V(X, np.roll(v, 1, axis=1))
-            V2, DV2 = _V(X, np.roll(v, 2, axis=1))
-            dv = _dVol_K(X)
+            V1, DV1 = _V(X, np.roll(v, -1, axis=1))
+            V2, DV2 = _V(X, np.roll(v, -2, axis=1))
 
-            k = 1 - np.sum(X * X, axis=0)
-            G11 = (1 - X[0, :] * X[0, :]) * k
-            G22 = (1 - X[1, :] * X[1, :]) * k
-            G12 = -X[0, :] * X[1, :] * k
+            dv = np.power(1 - np.sum(X * X, axis=0), -.5)
+
+            G11 = (1 - X[0, :] * X[0, :])
+            G22 = (1 - X[1, :] * X[1, :])
+            G12 = -X[0, :] * X[1, :]
             g = lambda u: np.array([G11 * u[0, :] + G12 * u[1, :], G12 * u[0, :] + G22 * u[1, :]])
 
             e0, e1, e2 = self._elements[i0], self._elements[i1], self._elements[i2]
@@ -277,8 +274,8 @@ class Model:
             Y = hyperboloid_to_klein(np.linalg.inv(T) @ Y)
 
             V0, DV0 = _V(X, v)
-            V1, DV1 = _V(X, np.roll(v, 1, axis=1))
-            V2, DV2 = _V(X, np.roll(v, 2, axis=1))
+            V1, DV1 = _V(X, np.roll(v, -1, axis=1))
+            V2, DV2 = _V(X, np.roll(v, -2, axis=1))
 
             _f_dv = f(Y[0, :] + 1j * Y[1, :]) * _dVol_K(X)
 
@@ -358,8 +355,8 @@ class Model:
             Y = hyperboloid_to_klein(np.linalg.inv(T) @ Y)
 
             V0, DV0 = _V(X, v)
-            V1, DV1 = _V(X, np.roll(v, 1, axis=1))
-            V2, DV2 = _V(X, np.roll(v, 2, axis=1))
+            V1, DV1 = _V(X, np.roll(v, -1, axis=1))
+            V2, DV2 = _V(X, np.roll(v, -2, axis=1))
 
             e = self._solution[self._elements[[i0, i1, i2]]]
             e[np.logical_not(self._mask[[i0, i1, i2]])] = 0

@@ -106,3 +106,49 @@ void Integrator::sample_hyp(double x0, double y0, double x1, double y1, double x
 		samples->push_back(y / (1 + t));
 	}
 }
+
+void Integrator::sample_hypsphere(double x0, double y0, double x1, double y1, double x2, double y2, double R,
+	std::vector<double>* samples, std::vector<double>* weights) {
+
+	samples->reserve(2 * N_vertices);
+	weights->reserve(N_vertices);
+
+	double t0 = 2.0 / (1.0 + x0 * x0 + y0 * y0);
+	double t1 = 2.0 / (1.0 + x1 * x1 + y1 * y1);
+	double t2 = 2.0 / (1.0 + x2 * x2 + y2 * y2);
+
+	x0 *= t0; y0 *= t0;
+	x1 *= t1; y1 *= t1;
+	x2 *= t2; y2 *= t2;
+
+	double u0 = x1 - x0;
+	double v0 = y1 - y0;
+
+	double u1 = x2 - x0;
+	double v1 = y2 - y0;
+
+	double s = glm::abs(u0 * v1 - u1 * v0);
+	double dv_s = 4.0 * R / ((1 - R) * (1 - R));
+
+	for (size_t i = 0; i < N_vertices; i++) {
+		double z = _vertices[2 * i + 0];
+		double w = _vertices[2 * i + 1];
+
+		double x = x0 + u0 * z + u1 * w;
+		double y = y0 + v0 * z + v1 * w;
+
+		double T = 1.0 - x * x - y * y;
+		double t = glm::sqrt(T);
+		double JacF = 1.0 / ((1 + t) * (1 + t) * t);
+		
+
+		x /= 1 + t;
+		y /= 1 + t;
+		double dv = dv_s / glm::sqrt(R * R - x * x - y * y);
+
+		weights->push_back(_weights[i] * s * dv * JacF);
+
+		samples->push_back(x);
+		samples->push_back(y);
+	}
+}

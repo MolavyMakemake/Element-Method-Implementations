@@ -169,9 +169,9 @@ class Model:
             X_K = F(self._integrator.vertices)
             X_D = _Phi_KtD(X_K)
 
-            V0, DV0 = _V(v_D[:, 0], v_D[:, 1], X_D)
-            V1, DV1 = _V(v_D[:, 1], v_D[:, 2], X_D)
-            V2, DV2 = _V(v_D[:, 2], v_D[:, 0], X_D)
+            V0, DV0 = _V(v_D[:, 1], v_D[:, 2], X_D)
+            V1, DV1 = _V(v_D[:, 2], v_D[:, 0], X_D)
+            V2, DV2 = _V(v_D[:, 0], v_D[:, 1], X_D)
             dv = np.square(1 - np.sum(X_D * X_D, axis=0)) * _dVol_K(X_K) / 4.0
             e0, e1, e2 = self._elements[i0], self._elements[i1], self._elements[i2]
 
@@ -243,9 +243,9 @@ class Model:
             Y = klein_to_hyperboloid(X_K)
             Y = hyperboloid_to_klein(np.linalg.inv(T) @ Y)
 
-            V0, DV0 = _V(v_D[:, 0], v_D[:, 1], X_D)
-            V1, DV1 = _V(v_D[:, 1], v_D[:, 2], X_D)
-            V2, DV2 = _V(v_D[:, 2], v_D[:, 0], X_D)
+            V0, DV0 = _V(v_D[:, 1], v_D[:, 2], X_D)
+            V1, DV1 = _V(v_D[:, 2], v_D[:, 0], X_D)
+            V2, DV2 = _V(v_D[:, 0], v_D[:, 1], X_D)
 
             _f_dv = f(Y[0, :] + 1j * Y[1, :]) * _dVol_K(X_K)
 
@@ -328,9 +328,9 @@ class Model:
 
             X_D = _Phi_KtD(X)
 
-            V0, DV0 = _V(v_D[:, 0], v_D[:, 1], X_D)
-            V1, DV1 = _V(v_D[:, 1], v_D[:, 2], X_D)
-            V2, DV2 = _V(v_D[:, 2], v_D[:, 0], X_D)
+            V0, DV0 = _V(v_D[:, 1], v_D[:, 2], X_D)
+            V1, DV1 = _V(v_D[:, 2], v_D[:, 0], X_D)
+            V2, DV2 = _V(v_D[:, 0], v_D[:, 1], X_D)
 
             e = self._solution[self._elements[[i0, i1, i2]]]
             e[np.logical_not(self._mask[[i0, i1, i2]])] = 0

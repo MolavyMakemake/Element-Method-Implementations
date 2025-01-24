@@ -22,26 +22,24 @@ def compute_h(vertices, polygons):
     return h
 
 R_k = np.sqrt(2) * np.tanh(.86)
-R = R_k / (1.0 + np.sqrt(1.0 - R_k * R_k))
+R = np.tanh(1.5)
 W = np.tanh(.86)
 W2 = W * W
 
-'''
-def v(z):
-    x2 = np.real(z) * np.real(z)
-    y2 = np.imag(z) * np.imag(z)
-    return (W2 - x2) * (W2 - y2)
-def f(z):
-    x2 = np.real(z) * np.real(z)
-    y2 = np.imag(z) * np.imag(z)
-    L = -2 * x2 * (1 - x2) * (W2 - y2) + 2 * x2 * y2 * (W2 - x2) \
-        -2 * y2 * (1 - y2) * (W2 - x2) + 2 * x2 * y2 * (W2 - y2) \
-        + (1 - x2 - y2) * (
-        -2 * (1 - x2) * (W2 - y2) + 4 * x2 * (W2 - y2) + 2 * y2 * (W2 - x2) - 4 * x2 * y2
-        -2 * (1 - y2) * (W2 - x2) + 4 * y2 * (W2 - x2) + 2 * x2 * (W2 - y2) - 4 * x2 * y2
-        )
-    return -L
-'''
+#def v(z):
+#    x2 = np.real(z) * np.real(z)
+#    y2 = np.imag(z) * np.imag(z)
+#    return (W2 - x2) * (W2 - y2)
+#def f(z):
+#    x2 = np.real(z) * np.real(z)
+#    y2 = np.imag(z) * np.imag(z)
+#    L = -2 * x2 * (1 - x2) * (W2 - y2) + 2 * x2 * y2 * (W2 - x2) \
+#        -2 * y2 * (1 - y2) * (W2 - x2) + 2 * x2 * y2 * (W2 - y2) \
+#        + (1 - x2 - y2) * (
+#        -2 * (1 - x2) * (W2 - y2) + 4 * x2 * (W2 - y2) + 2 * y2 * (W2 - x2) - 4 * x2 * y2
+#        -2 * (1 - y2) * (W2 - x2) + 4 * y2 * (W2 - x2) + 2 * x2 * (W2 - y2) - 4 * x2 * y2
+#        )
+#    return -L
 
 g0 = lambda t: -np.log(1 - t)
 c = g0(R * R)
@@ -70,11 +68,17 @@ Y_g = [[] for _ in range(len(F))]
 #                        "../meshgen/output/triangulation_euc_4096(230).txt",
 #                        "../meshgen/output/triangulation_euc_8192(288).txt"]:
 
-_bdry_N = [100, 400, 900]
+_bdry_N = [256-110, 512-131, 1024-185, 2048-288, 4096-377, 8192-610]
 _bdry_i = 0
-for triangulation_f in ["../meshgen/output/triangulation_rect_hyp_180(80).txt",
-                        "../meshgen/output/triangulation_rect_hyp_560(160).txt",
-                        "../meshgen/output/triangulation_rect_hyp_1100(200).txt"]:
+#for triangulation_f in ["../meshgen/output/triangulation_rect_hyp_180(80).txt",
+#                        "../meshgen/output/triangulation_rect_hyp_560(160).txt",
+#                        "../meshgen/output/triangulation_rect_hyp_1100(200).txt"]:
+for triangulation_f in ["../meshgen/output/triangulation_hyp_256(110).txt",
+                        "../meshgen/output/triangulation_hyp_512(131).txt",
+                        "../meshgen/output/triangulation_hyp_1024(185).txt",
+                        "../meshgen/output/triangulation_hyp_2048(288).txt",
+                        "../meshgen/output/triangulation_hyp_4096(377).txt",
+                        "../meshgen/output/triangulation_hyp_8192(610).txt"]:
 
     vertices = []
     triangles = []
@@ -120,9 +124,9 @@ if True:
 
     plt.loglog(H_dof[0], Y_g[0], "o--", color="black", label="Simplex k=1")
     plt.loglog(H_dof[1], Y_g[1], "<--", color="black", label="Staudtian k=1")
-    plt.loglog(H_dof[2], Y_g[2], "x--", color="gray", label="Homogeneous k=1")
-    plt.loglog(H_dof[3], Y_g[3], "o--", color="black", label="Klein k=1")
-    plt.loglog(H_dof[4], Y_g[4], "o--", color="black", label="Klein k=2")
+    plt.loglog(H_dof[2], Y_g[2], "x--", color="black", label="Homogeneous k=1")
+    plt.loglog(H_dof[3], Y_g[3], "o--", color="red", label="Klein k=1")
+    plt.loglog(H_dof[4], Y_g[4], "<--", color="red", label="Klein k=2")
     plt.ylabel("Relative error (hyperbolic metric)")
     plt.xlabel("# DOF")
     plt.legend()
@@ -130,9 +134,9 @@ if True:
 
     plt.loglog(H_g[0], Y_g[0], "o--", color="black", label="Simplex k=1")
     plt.loglog(H_g[1], Y_g[1], "<--", color="black", label="Staudtian k=1")
-    plt.loglog(H_g[2], Y_g[2], "x--", color="gray", label="Homogeneous k=1")
-    plt.loglog(H_g[3], Y_g[3], "o--", color="black", label="Klein k=1")
-    plt.loglog(H_g[4], Y_g[4], "o--", color="black", label="Klein k=2")
+    plt.loglog(H_g[2], Y_g[2], "x--", color="black", label="Homogeneous k=1")
+    plt.loglog(H_g[3], Y_g[3], "o--", color="red", label="Klein k=1")
+    plt.loglog(H_g[4], Y_g[4], "<--", color="red", label="Klein k=2")
     plt.ylabel("Relative error (hyperbolic metric)")
     plt.xlabel("Mesh size (hyperbolic metric)")
     plt.legend()
