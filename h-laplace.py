@@ -43,7 +43,7 @@ def A_tri(x):
 
     sgn = 2 * (x[0, :] > 0) - 1
     sgn = 1
-    return 2 * sgn * np.atan(np.sqrt(np.abs(A)) / B)
+    return 2 * np.atan(np.sqrt(np.abs(A)) / B)
 
 def A_htri(x, y):
     def sign (A, B):
@@ -125,8 +125,8 @@ ax = plt.axes(projection='3d')
 ax.set_xlabel("x")
 ax.set_ylabel("y")
 
-ax.plot_surface(_X0, _X1, DF[0], label="f_1")
-ax.scatter(X[0, :], X[1, :], D1V(X), s=0.1, color="yellow")
+ax.plot_surface(_X0, _X1, np.clip(LgF, -0.01, 0.01), label="f_1")
+#ax.scatter(X[0, :], X[1, :], D1V(X), s=0.1, color="yellow")
 #ax.plot_surface(_X0, _X1, np.clip(np.reshape(D1V(X), (res, res)), -1, 1), label="f_1")
 #ax.plot_surface(X, Y, k * k * DF[1], label="f_2")
 #ax.plot_surface(X, Y, np.clip(LgF, -1, 1), label="Lf")
