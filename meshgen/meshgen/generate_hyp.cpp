@@ -181,7 +181,9 @@ namespace {
     double sphere_voronoi_magnitude(double R, double x0, double y0, double x, double y) {
         double dx = x0 - x;
         double dy = y0 - y;
-        return (dx * dx + dy * dy) / (1 - x0 * x0 - y0 * y0);
+        double dz = glm::sqrt(R * R - x0 * x0 - y0 * y0) -
+            glm::sqrt(R * R - x * x - y * y);
+        return dx * dx + dy * dy + dz * dz;
     }
 
     size_t sphere_voronoi_index(std::vector<double>& vertices, double R, size_t i0, size_t i1, size_t i2, double x, double y) {
@@ -267,7 +269,7 @@ triangulation_t sphere_hyp(int N_vertices, int N_boundary, double radius, int N_
 
     Integrator integrator(integral_resolution);
     for (int i = 0; i < N_iterations; i++) {
-        iterate(triangulation, radius, integrator, true);
+        iterate_sphere(triangulation, radius, integrator, true);
     }
 
     return triangulation;

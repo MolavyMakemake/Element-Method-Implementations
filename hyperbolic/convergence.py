@@ -96,11 +96,11 @@ for triangulation_f in ["../meshgen/output/triangulation_hyp_256(110).txt",
         _triangles.append([triangles[i], triangles[i + 1], triangles[i + 2]])
 
     models = [
-        FEM_SIMPLEX_O1.Model(vertices_k, _triangles, boundary, int_res=100),
-        FEM_STAUDTIAN_O1.Model(vertices_k, _triangles, boundary, int_res=100),
-        FEM_HOMOGENEOUS_O1.Model(vertices_k, _triangles, boundary, int_res=100),
-        FEM_BKDISK_O1.Model(vertices_k, _triangles, boundary),
-        FEM_BKDISK_O2.Model(vertices_k, _triangles, boundary)
+        FEM_SIMPLEX_O1.Model(vertices_k, _triangles, boundary, int_res=200),
+        FEM_STAUDTIAN_O1.Model(vertices_k, _triangles, boundary, int_res=200),
+        FEM_HOMOGENEOUS_O1.Model(vertices_k, _triangles, boundary, int_res=200),
+        FEM_BKDISK_O1.Model(vertices_k, _triangles, boundary, int_res=200),
+        FEM_BKDISK_O2.Model(vertices_k, _triangles, boundary, int_res=200)
     ]
 
     h = compute_h(vertices, _triangles)

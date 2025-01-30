@@ -137,14 +137,13 @@ void Integrator::sample_hypsphere(double x0, double y0, double x1, double y1, do
 		double x = x0 + u0 * z + u1 * w;
 		double y = y0 + v0 * z + v1 * w;
 
-		double T = 1.0 - x * x - y * y;
-		double t = glm::sqrt(T);
+		double t = glm::sqrt(1.0 - x * x - y * y);
 		double JacF = 1.0 / ((1 + t) * (1 + t) * t);
 		
 
 		x /= 1 + t;
 		y /= 1 + t;
-		double dv = dv_s / glm::sqrt(R * R - x * x - y * y);
+		double dv = dv_s / glm::sqrt(std::max<double>(R * R - x * x - y * y, 1e-5));
 
 		weights->push_back(_weights[i] * s * dv * JacF);
 

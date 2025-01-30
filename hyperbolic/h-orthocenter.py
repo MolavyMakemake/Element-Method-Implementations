@@ -159,8 +159,8 @@ if True:
 
     y1 = f(s1, a)[2, :]
     y2 = f(s1, a2)[2, :]
-    plt.plot(t, y1)
-    plt.plot(t, y2)
+    plt.plot(t, y1 / np.min(y1), color="r")
+    plt.plot(t, y2 / np.max(y2), color="g")
     plt.show()
 
     #for _x in [s1, s2, s3, s4, s5]:
