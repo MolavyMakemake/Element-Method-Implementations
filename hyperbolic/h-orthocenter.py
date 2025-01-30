@@ -9,6 +9,27 @@ def klein_to_hyperboloid(x):
     t = 1 / np.sqrt(1 - np.sum(x*x, axis=0))
     return np.concatenate((t[np.newaxis, :], t * x))
 
+def _midpoint_bkdisk(x, y):
+    _a = (x - y) @ (x - y)
+    _b = x @ x - x @ y
+    _c = 1 - x @ x
+
+    _d = np.sqrt(_b * _b + _a * _c)
+    t0 = (_b + _d) / _a
+    t1 = (_b - _d) / _a
+
+    A = x + t0 * (y - x)
+    B = x + t1 * (y - x)
+
+    Ax = np.sqrt((x - A) @ (x - A))
+    Ay = np.sqrt((y - A) @ (y - A))
+    AB = np.sqrt((B - A) @ (B - A))
+
+    ab = np.sqrt(Ax * Ay)
+    t = ab / (np.sqrt((AB - Ax) * (AB - Ay)) + ab)
+
+    return A + t * (B - A)
+
 def hyperboloid_to_klein(x):
     return x[1:, :] / x[0, :]
 
@@ -72,6 +93,19 @@ def barymap(a):
     y = klein_to_hyperboloid(bc[:, np.newaxis])[:, 0]
     return translate(y)
 
+def centroidmap(a):
+    m1 = _midpoint_bkdisk(a[:, 0], a[:, 2])
+    m2 = _midpoint_bkdisk(a[:, 0], a[:, 1])
+
+    M = a[:, 1] + np.linalg.solve(
+        np.array([m1 - a[:, 1], m2 - a[:, 2]]).T,
+        a[:, 2] - a[:, 1]
+    )[0] * (m1 - a[:, 1])
+
+    return translate(
+        klein_to_hyperboloid(M[:, np.newaxis])[:, 0]
+    )
+
 def f1(x, y):
     return x * np.power((1 - y * y) / ((1 - x * x) * (1 - x * x - y * y)), .25)
 
@@ -82,7 +116,7 @@ def f(x, a):
     b = klein_to_hyperboloid(a)
     y = klein_to_hyperboloid(x)
 
-    A = orthomap(b)
+    A = centroidmap(a)
     b = hyperboloid_to_klein(A @ b)
     y = hyperboloid_to_klein(A @ y)
 

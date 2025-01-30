@@ -111,12 +111,15 @@ if False:
 if True:
     integrator = Integrator.Integrator(100, open=True)
     x = a0[:, np.newaxis] + np.array([a1 - a0, a2 - a0]).T @ integrator.vertices
-    y, d1, d2 = staudtian(x, a0, a1)
+
+    y0, d1, d2 = staudtian(x, a0, a1)
+    y1, _, _ = staudtian(x, a1, a2)
+    y2, _, _ = staudtian(x, a0, a2)
 
     fig = plt.figure()
     ax = plt.axes(projection='3d')
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    ax.scatter(x[0, :], x[1, :], d2, s=.4)
+    ax.scatter(x[0, :], x[1, :], np.arcsinh(y0) + np.arcsinh(y1) + np.arcsinh(y2), s=.4)
     ax.legend()
     plt.show()

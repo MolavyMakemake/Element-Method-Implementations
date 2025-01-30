@@ -8,7 +8,7 @@ def _dVol(x, y):
     return np.power(1 - x * x - y * y, -1.5)
 
 class Model:
-    def __init__(self, vertices, triangles, trace
+    def __init__(self, vertices, triangles, trace, int_res=100
                  , isTraceFixed=True, computeSpectrumOnBake=False):
 
         self.isTraceFixed = isTraceFixed
@@ -18,7 +18,7 @@ class Model:
         self._identify = [[], []]
         self._elements = []
 
-        self._integrator = Integrator(100)
+        self._integrator = Integrator(int_res)
 
         self.vertices = vertices
         self.polygons = triangles
