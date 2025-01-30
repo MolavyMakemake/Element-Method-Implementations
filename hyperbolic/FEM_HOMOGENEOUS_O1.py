@@ -130,7 +130,7 @@ class Model:
         self._identify = [[], []]
         self._elements = []
 
-        self._integrator = Integrator(int_res)
+        self._integrator = Integrator(int_res, open=True)
 
         self.vertices = vertices
         self.polygons = triangles
