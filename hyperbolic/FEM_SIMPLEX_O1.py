@@ -52,16 +52,22 @@ def _V(u, v, x):
     d1 = _vec_delta(x, u)
     d2 = _vec_delta(x, v)
 
-    xu = x - u[:, np.newaxis]
-    xv = x - v[:, np.newaxis]
+    A = np.abs(1 - d0 * d0 - d1 * d1 - d2 * d2 + 2 * d0 * d1 * d2)
+    B = 1 + d0 + d1 + d2
 
-    x2 = np.sum(x * x, axis=0)
+    vol = 2 * np.arctan(np.sqrt(A) / B)
+    return vol / np.max(vol)
 
-    Dd1 = (2 * (d1 - 1) * x[0, :] / (1 - x2) + 4 * xu[0, :] / ((1 - x2) * (1 - u @ u)),
-           2 * (d1 - 1) * x[1, :] / (1 - x2) + 4 * xu[1, :] / ((1 - x2) * (1 - u @ u)))
+def _RHS_V(Y, d0, v1, v2, b1, b2):
+    Y2 = np.sum(Y * Y, axis=0)
+    d1 = 1.0 + 2.0 * np.sum(v1 * v1, axis=0) / ((1.0 - Y2) * b1)
+    d2 = 1.0 + 2.0 * np.sum(v2 * v2, axis=0) / ((1.0 - Y2) * b2)
 
-    Dd2 = (2 * (d2 - 1) * x[0, :] / (1 - x2) + 4 * xv[0, :] / ((1 - x2) * (1 - v @ v)),
-           2 * (d2 - 1) * x[1, :] / (1 - x2) + 4 * xv[1, :] / ((1 - x2) * (1 - v @ v)))
+    Dd1 = (2 * (d1 - 1) * Y[0, :] / (1 - Y2) + 4 * v1[0] / ((1 - Y2) * b1),
+           2 * (d1 - 1) * Y[1, :] / (1 - Y2) + 4 * v1[1] / ((1 - Y2) * b1))
+
+    Dd2 = (2 * (d2 - 1) * Y[0, :] / (1 - Y2) + 4 * v2[0] / ((1 - Y2) * b2),
+           2 * (d2 - 1) * Y[1, :] / (1 - Y2) + 4 * v2[1] / ((1 - Y2) * b2))
 
     A = np.abs(1 - d0 * d0 - d1 * d1 - d2 * d2 + 2 * d0 * d1 * d2)
     B = 1 + d0 + d1 + d2
@@ -73,12 +79,82 @@ def _V(u, v, x):
 
     V = np.sqrt(A) / B
     DV = (2 * V / (1 + V * V) * (a1 / A - b1 / B),
-       2 * V / (1 + V * V) * (a2 / A - b2 / B))
+          2 * V / (1 + V * V) * (a2 / A - b2 / B))
 
     vol = 2 * np.arctan(V)
-    M = np.max(vol)
+    M = vol[0]
 
     return vol / M, np.array(DV) / M
+
+def _RHS_bdry_int(a, b, t, dt):
+    u1 = a[:, 1] - a[:, 0]
+    u2 = a[:, 2] - a[:, 0]
+
+    b1 = 1.0 - b[:, 1] @ b[:, 1]
+    b2 = 1.0 - b[:, 2] @ b[:, 2]
+
+    d0 = 1.0 + 2.0 * (b[:, 2] - b[:, 1]) @ (b[:, 2] - b[:, 1]) / (b1 * b2)
+
+    X = a[:, 0, np.newaxis] + np.outer(u1, t)
+    X2 = X * X
+
+    c = np.sqrt(1.0 - np.sum(X2, axis=0))
+    Y = X / (1.0 + c)
+
+    v1 = Y - b[:, 1, np.newaxis]
+    v2 = Y - b[:, 2, np.newaxis]
+
+    V, DV = _RHS_V(Y, d0, v1, v2, b1, b2)
+
+    s = (1 + c) * (1 + c) * c
+    g11 = 1.0 - X2[0, :]
+    g12 = -X[0, :] * X[1, :]
+    g22 = 1.0 - X2[1, :]
+
+    dV = np.array([
+        DV[0, :] * (1 / (1 + c) + X2[0, :] / s) - DV[1, :] * g12 / s,
+        DV[1, :] * (1 / (1 + c) + X2[1, :] / s) - DV[0, :] * g12 / s,
+    ])
+    s_dV = np.array([
+        -g12 * dV[0, :] - g22 * dV[1, :],
+        g11 * dV[0, :] + g12 * dV[1, :]
+    ]) / c
+
+    I_v = V * (u1 @ s_dV)
+    I = np.sum(I_v * dt) - .5 * I_v[0] * dt
+
+    ###
+
+    X = a[:, 0, np.newaxis] + np.outer(u2, t)
+    X2 = X * X
+
+    c = np.sqrt(1.0 - np.sum(X2, axis=0))
+    Y = X / (1.0 + c)
+
+    v1 = Y - b[:, 1, np.newaxis]
+    v2 = Y - b[:, 2, np.newaxis]
+
+    V, DV = _RHS_V(Y, d0, v1, v2, b1, b2)
+
+    s = (1 + c) * (1 + c) * c
+    g11 = 1.0 - X2[0, :]
+    g12 = -X[0, :] * X[1, :]
+    g22 = 1.0 - X2[1, :]
+
+    dV = np.array([
+        DV[0, :] * (1 / (1 + c) + X2[0, :] / s) - DV[1, :] * g12 / s,
+        DV[1, :] * (1 / (1 + c) + X2[1, :] / s) - DV[0, :] * g12 / s,
+    ])
+    s_dV = np.array([
+        -g12 * dV[0, :] - g22 * dV[1, :],
+        g11 * dV[0, :] + g12 * dV[1, :]
+    ]) / c
+
+    I_v = V * (u2 @ s_dV)
+    I -= np.sum(I_v * dt) - .5 * I_v[0] * dt
+
+    return np.abs(I)
+
 
 def _Phi_KtD(x):
     return x / (1 + np.sqrt(1 - np.sum(x * x, axis=0)))
@@ -102,6 +178,7 @@ class Model:
         self._elements = []
 
         self._integrator = Integrator(int_res, open=True)
+        self._int_res = int_res
 
         self.vertices = vertices
         self.polygons = triangles
@@ -156,58 +233,40 @@ class Model:
 
             v_D = _Phi_KtD(v_K)
 
-            A = np.array([
-                v_K[:, 1] - v_K[:, 0],
-                v_K[:, 2] - v_K[:, 0]
-            ]).T
-            F = lambda x: v_K[:, 0, np.newaxis] + A @ x
-            Jac_F = np.abs(A[0, 0] * A[1, 1] - A[1, 0] * A[0, 1])
+            N = self._int_res * (self._int_res + 1) // 4
 
-            X_K = F(self._integrator.vertices)
-            X_D = _Phi_KtD(X_K)
+            dt = 1.0 / N
+            t = np.linspace(0, 1.0 - dt, N)
 
-            V0, DV0 = _V(v_D[:, 1], v_D[:, 2], X_D)
-            V1, DV1 = _V(v_D[:, 2], v_D[:, 0], X_D)
-            V2, DV2 = _V(v_D[:, 0], v_D[:, 1], X_D)
-            dv = np.square(1 - np.sum(X_D * X_D, axis=0)) * _dVol_K(X_K) / 4.0
+            I0 = _RHS_bdry_int(np.roll(v_K, -0, axis=1), np.roll(v_D, -0, axis=1), t, dt)
+            I1 = _RHS_bdry_int(np.roll(v_K, -1, axis=1), np.roll(v_D, -1, axis=1), t, dt)
+            I2 = _RHS_bdry_int(np.roll(v_K, -2, axis=1), np.roll(v_D, -2, axis=1), t, dt)
 
             e0, e1, e2 = self._elements[i0], self._elements[i1], self._elements[i2]
 
             if self._mask[i0]:
-                L[e0, e0] += Jac_F * self._integrator.integrate_vector(
-                    np.sum(DV0 * DV0, axis=0) * dv
-                )
+                L[e0, e0] += I0
 
                 if self._mask[i1]:
-                    L01 = Jac_F * self._integrator.integrate_vector(
-                        np.sum(DV0 * DV1, axis=0) * dv
-                    )
+                    L01 = .5 * (I2 - I1 - I0)
                     L[e0, e1] += L01
                     L[e1, e0] += L01
 
                 if self._mask[i2]:
-                    L02 = Jac_F * self._integrator.integrate_vector(
-                        np.sum(DV0 * DV2, axis=0) * dv
-                    )
+                    L02 = .5 * (I1 - I0 - I2)
                     L[e0, e2] += L02
                     L[e2, e0] += L02
 
             if self._mask[i1]:
-                L[e1, e1] += Jac_F * self._integrator.integrate_vector(
-                    np.sum(DV1 * DV1, axis=0) * dv
-                )
+                L[e1, e1] += I1
 
                 if self._mask[i2]:
-                    L12 = Jac_F * self._integrator.integrate_vector(
-                        np.sum(DV1 * DV2, axis=0) * dv
-                    )
+                    L12 = .5 * (I0 - I2 - I1)
                     L[e1, e2] += L12
                     L[e2, e1] += L12
 
             if self._mask[i2]:
-                L[e2, e2] += Jac_F * self._integrator.integrate_vector(
-                    np.sum(DV2 * DV2, axis=0) * dv
-                )
+                L[e2, e2] += I2
 
             # print(L)
 
@@ -241,9 +300,9 @@ class Model:
             Y = klein_to_hyperboloid(X_K)
             Y = hyperboloid_to_klein(np.linalg.inv(T) @ Y)
 
-            V0, DV0 = _V(v_D[:, 1], v_D[:, 2], X_D)
-            V1, DV1 = _V(v_D[:, 2], v_D[:, 0], X_D)
-            V2, DV2 = _V(v_D[:, 0], v_D[:, 1], X_D)
+            V0 = _V(v_D[:, 1], v_D[:, 2], X_D)
+            V1 = _V(v_D[:, 2], v_D[:, 0], X_D)
+            V2 = _V(v_D[:, 0], v_D[:, 1], X_D)
 
             _f_dv = f(Y[0, :] + 1j * Y[1, :]) * _dVol_K(X_K)
 
@@ -327,9 +386,9 @@ class Model:
 
             X_D = _Phi_KtD(X)
 
-            V0, DV0 = _V(v_D[:, 1], v_D[:, 2], X_D)
-            V1, DV1 = _V(v_D[:, 2], v_D[:, 0], X_D)
-            V2, DV2 = _V(v_D[:, 0], v_D[:, 1], X_D)
+            V0 = _V(v_D[:, 1], v_D[:, 2], X_D)
+            V1 = _V(v_D[:, 2], v_D[:, 0], X_D)
+            V2 = _V(v_D[:, 0], v_D[:, 1], X_D)
 
             e = self._solution[self._elements[[i0, i1, i2]]]
             e[np.logical_not(self._mask[[i0, i1, i2]])] = 0
