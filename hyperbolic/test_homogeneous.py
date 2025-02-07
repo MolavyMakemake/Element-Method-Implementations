@@ -20,6 +20,12 @@ def V2(x):
         .5 * x[0, :] * x[1, :] * (1 / (1 - r[0, :] - r[1, :]) - 1 / (1 - r[1, :]))
     ])
 
+def W_vec(x):
+    r = x * x
+    return (1 - r[0, :] - r[1, :]) * np.array([
+        x[0, :] / (1 - r[1, :]), x[1, :] / (1 - r[0, :])
+    ])
+
 def W(x):
     r = x * x
     return np.array([
@@ -45,7 +51,7 @@ N_samples = []
 I = []
 J = []
 
-for N in [100]:
+for N in [100, 200]:
     print("N =",N)
 
     N_t = N * (N + 1) // 6
@@ -87,19 +93,19 @@ for N in [100]:
     f2_vw, df2_vw = V2(X_vw)
     f2_wu, df2_wu = V2(X_wu)
 
-    _J_v = (v - u) @ star(df1_uv, X_uv) * f2_uv
-    _J_v += (w - v) @ star(df1_vw, X_vw) * f2_vw
-    _J_v += (u - w) @ star(df1_wu, X_wu) * f2_wu
+    _J_v = (v - u) @ star(df1_uv, X_uv) * f1_uv
+    _J_v += (w - v) @ star(df1_vw, X_vw) * f1_vw
+    _J_v += (u - w) @ star(df1_wu, X_wu) * f1_wu
 
-    _J_v -= .25 * (v - u) @ star(W(X_uv), X_uv) * f1_uv * f2_uv
-    _J_v -= .25 * (w - v) @ star(W(X_vw), X_vw) * f1_vw * f2_vw
-    _J_v -= .25 * (u - w) @ star(W(X_wu), X_wu) * f1_wu * f2_wu
+    _J_v -= ((v - u) @ df1_uv) * np.sum(W_vec(X_uv) * star(df1_uv, X_uv), axis=0)
+    _J_v -= ((w - v) @ df1_vw) * np.sum(W_vec(X_vw) * star(df1_vw, X_vw), axis=0)
+    _J_v -= ((u - w) @ df1_wu) * np.sum(W_vec(X_wu) * star(df1_wu, X_wu), axis=0)
 
     _J = np.sum(_J_v * dt) - .5 * (_J_v[0] + _J_v[-1]) * dt
 
     N_samples.append(N * (N + 1) // 2)
     I.append(_I)
-    J.append(_J)
+    J.append(_J / 2)
 
 plt.plot(N_samples, I, "o--", label="interior integral")
 plt.plot(N_samples, J, "o--", label="path integral")

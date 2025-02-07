@@ -116,7 +116,7 @@ def f(x, a):
     b = klein_to_hyperboloid(a)
     y = klein_to_hyperboloid(x)
 
-    A = centroidmap(a)
+    A = translate(b[:, 0])
     b = hyperboloid_to_klein(A @ b)
     y = hyperboloid_to_klein(A @ y)
 
@@ -191,10 +191,10 @@ if True:
     s4 = a2[:, 2, np.newaxis] + np.outer((a2[:, 0] - a2[:, 2]), t)
     s5 = a2[:, 2, np.newaxis] + np.outer((a2[:, 1] - a2[:, 2]), t)
 
-    y1 = f(s1, a)[2, :]
-    y2 = f(s1, a2)[2, :]
-    plt.plot(t, y1 / np.min(y1), color="r")
-    plt.plot(t, y2 / np.max(y2), color="g")
+    y1 = f(s1, a)[0, :]
+    y2 = f(s1, a2)[0, :]
+    plt.plot(t, y1, color="r")
+    plt.plot(t, y2, color="g")
     plt.show()
 
     #for _x in [s1, s2, s3, s4, s5]:
