@@ -46,6 +46,7 @@ def _V(u, v, x):
 
 def _RHS_V(Y, d0, v1, v2, b1, b2):
     Y2 = np.sum(Y * Y, axis=0)
+    print(np.max(Y2))
     d1 = 1.0 + 2.0 * np.sum(v1 * v1, axis=0) / ((1.0 - Y2) * b1)
     d2 = 1.0 + 2.0 * np.sum(v2 * v2, axis=0) / ((1.0 - Y2) * b2)
 
@@ -109,6 +110,9 @@ def _RHS_bdry_int(a, b, t, dt):
     I_v = V * (u1 @ s_dV)
     I = np.sum(I_v * dt) - .5 * I_v[0] * dt
 
+    #plt.plot(t, I_v)
+    #plt.show()
+
     ###
 
     X = a[:, 0, np.newaxis] + np.outer(u2, t)
@@ -148,20 +152,20 @@ def RHS(a, N):
     b = a / (1.0 + np.sqrt(1.0 - np.sum(a * a, axis=0)))
 
     I0 = _RHS_bdry_int(np.roll(a, -0, axis=1), np.roll(b, -0, axis=1), t, dt)
-    I1 = _RHS_bdry_int(np.roll(a, -1, axis=1), np.roll(b, -1, axis=1), t, dt)
-    I2 = _RHS_bdry_int(np.roll(a, -2, axis=1), np.roll(b, -2, axis=1), t, dt)
+    #I1 = _RHS_bdry_int(np.roll(a, -1, axis=1), np.roll(b, -1, axis=1), t, dt)
+    #I2 = _RHS_bdry_int(np.roll(a, -2, axis=1), np.roll(b, -2, axis=1), t, dt)
 
-    return I0, I1, I2
+    return I0, 0, 0
 
-u = np.array([-.5, .6])
-w = np.array([-.6, -0.1])
-v = np.array([.5, .2])
+u = np.array([-0.8, .0])
+w = np.array([.2, -0.6])
+v = np.array([.0, -1.0])
 
 N_samples = []
 I_arr = []
 J_arr = []
 
-for N in [100, 200, 300]:
+for N in [100]:
     print("N =", N)
 
     N_t = N * (N + 1) // 4
@@ -179,24 +183,24 @@ for N in [100, 200, 300]:
     path_uw = np.array([u[0] + t * (w[0] - u[0]), u[1] + t * (w[1] - u[1])])
     path_vw = np.array([v[0] + t * (w[0] - v[0]), v[1] + t * (w[1] - v[1])])
 
-    V0, DV0 = _V(v, w, Y)
-    V1, DV1 = _V(u, w, Y)
-    V2, DV2 = _V(u, v, Y)
+    #V0, DV0 = _V(v, w, Y)
+    #V1, DV1 = _V(u, w, Y)
+    #V2, DV2 = _V(u, v, Y)
 
     g = np.square(1 - np.sum(Y * Y, axis=0)) / 4.0
     dv = np.power(1 - np.sum(X * X, axis=0), -1.5)
 
-    I = Jac_A * integrator.integrate_vector(
-        g * np.sum(DV0 * DV2, axis=0) * dv
-    )
+    #I = Jac_A * integrator.integrate_vector(
+    #    g * np.sum(DV0 * DV0, axis=0) * dv
+    #)
 
     J0, J1, J2 = RHS(np.array([u, v, w]).T, N_t)
 
     N_samples.append(N * (N + 1) // 2)
-    I_arr.append(I)
-    J_arr.append(.5 * (J1 - J2 - J0))
+    #I_arr.append(I)
+    J_arr.append(J0)
 
-plt.plot(N_samples, I_arr, "o--", label="interior integral")
+#plt.plot(N_samples, I_arr, "o--", label="interior integral")
 plt.plot(N_samples, J_arr, "o--", label="path integral")
 
 plt.xlabel("nr. samples")

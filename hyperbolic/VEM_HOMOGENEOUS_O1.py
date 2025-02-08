@@ -17,6 +17,9 @@ def klein_to_hyperboloid(x):
     return np.concatenate((np.ones_like(x[0, :])[np.newaxis, :], x)) \
         / np.sqrt(1 - np.sum(x*x, axis=0))
 
+def area(v, t):
+
+
 _BC_INTEGRATOR = Integrator(20)
 def barycenter(v):
     X = v[:, 0, np.newaxis] + np.array([
