@@ -43,20 +43,23 @@ def angles(x0, x1, x2):
     a2 = np.arccos(-cos_a(u2, u0, y0))
     return [a0, a1, a2]
 
+N_v = 8192
+N_bdry = 610
+
 vertices = []
 triangles = []
-file = open("../meshgen/output/triangulation_rect_hyp_1100(200).txt")
+file = open(f"../meshgen/output/triangulation_hyp_{N_v}({N_bdry}).txt")
 exec(file.read())
 vertices = np.array(vertices).reshape((len(vertices) // 2, 2)).T
 file.close()
 
 R = np.tanh(1.5)
-boundary = [i for i in range(900, np.size(vertices, axis=1), 1)]
+boundary = [i for i in range(N_v - N_bdry, np.size(vertices, axis=1), 1)]
 _triangles = []
 for i in range(0, len(triangles), 3):
     _triangles.append([triangles[i], triangles[i + 1], triangles[i + 2]])
 
-save(vertices, _triangles, boundary, "uniform_rect_1100")
+save(vertices, _triangles, boundary, f"uniform_disk_hyp_{N_v}")
 
 H = []
 T = []

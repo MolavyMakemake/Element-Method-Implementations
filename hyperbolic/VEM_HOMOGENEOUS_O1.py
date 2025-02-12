@@ -3,6 +3,7 @@ import scipy.sparse as sp
 from matplotlib import pyplot as plt
 from Integrator import Integrator
 from hyperbolic import triangulate, plot
+import vem_triangulate
 
 def _dVol(x, y):
     return np.power(1 - x * x - y * y, -1.5)
@@ -17,7 +18,95 @@ def klein_to_hyperboloid(x):
     return np.concatenate((np.ones_like(x[0, :])[np.newaxis, :], x)) \
         / np.sqrt(1 - np.sum(x*x, axis=0))
 
-def area(v, t):
+def _vec_delta(x, u):
+    w = x - u[:, np.newaxis]
+    x2 = np.sum(x * x, axis=0)
+    w2 = np.sum(w * w, axis=0)
+    return 1 + 2 * w2 / ((1 - x2) * (1 - u @ u))
+
+def compute_hyperbolic_area(v):
+    N_v = np.size(v, axis=1)
+
+    I = (N_v - 2) * np.pi
+    for i1 in range(N_v):
+        i0 = i1 - 1
+        i2 = (i1 + 1) % N_v
+
+        u1 = v[:, i2] - v[:, i1]
+        u2 = v[:, i0] - v[:, i1]
+
+        r = v[:, i1] * v[:, i1]
+        g = np.array([
+            [1 - r[1], v[0, i1] * v[1, i1]],
+            [v[0, i1] * v[1, i1], 1 - r[0]]
+        ]) / np.square(1 - r[0] - r[1])
+
+        I -= np.arccos(np.dot(u1, g @ u2) / np.sqrt(
+            np.dot(u1, g @ u1) * np.dot(u2, g @ u2)
+        ))
+
+    return I
+
+def compute_area(v, t, dt):
+    dv = np.roll(v, -1, axis=1) - v
+
+    I = 0
+    for i in range(np.size(v, axis=1)):
+        X = v[:, i, np.newaxis] + np.outer(dv[:, i], t)
+        r = X * X
+        c = np.sqrt(1.0 - np.sum(r, axis=0))
+
+        Y = X / (1 + c)
+        dy = np.array([
+            Y[0, :] * Y[1, :] / c,
+            1 / (1 + c) + Y[1, :] * Y[1, :] / c
+        ])
+
+        I_v = dv[:, i] @ dy * Y[0, :]
+        I += np.sum(I_v * dt) - .5 * (I_v[0] + I_v[-1]) * dt
+
+    return I
+
+def proj_RHS(v, t, dt):
+    v_1 = np.roll(v, -1, axis=1)
+    dv = v_1 - v
+
+    N_v = np.size(v, axis=1)
+    I = np.zeros(shape=(2, N_v), dtype=float)
+
+    for i in range(N_v):
+        X = v[:, i, np.newaxis] + np.outer(dv[:, i], t)
+        r = X * X
+        c = np.sqrt(1.0 - np.sum(r, axis=0))
+
+        Y = X / (1 + c)
+
+        dx = np.array([
+            1 / (1 + c) + Y[0, :] * Y[0, :] / c,
+            Y[0, :] * Y[1, :] / c
+        ])
+        dy = np.array([
+            Y[0, :] * Y[1, :] / c,
+            1 / (1 + c) + Y[1, :] * Y[1, :] / c
+        ])
+
+        e = np.arccosh(_vec_delta(Y, v[:, i] / (1 + np.sqrt(1 - v[:, i] @ v[:, i]))))
+        e /= e[-1]
+
+        I0_v = dv[:, i] @ dy * (1 - e)
+        I1_v = -dv[:, i] @ dx * (1 - e)
+
+        I[0, i] += np.sum(I0_v * dt) - .5 * (I0_v[0] + I0_v[-1]) * dt
+        I[1, i] += np.sum(I1_v * dt) - .5 * (I1_v[0] + I1_v[-1]) * dt
+
+        j = (i + 1) % N_v
+        J0_v = dv[:, i] @ dy * e
+        J1_v = -dv[:, i] @ dx * e
+
+        I[0, j] += np.sum(J0_v * dt) - .5 * (J0_v[0] + J0_v[-1]) * dt
+        I[1, j] += np.sum(J1_v * dt) - .5 * (J1_v[0] + J1_v[-1]) * dt
+
+    return I
 
 
 _BC_INTEGRATOR = Integrator(20)
@@ -123,7 +212,7 @@ def _Jac_Phi_KtD(x):
     return 1 / (A * (1 + A) * (1 + A))
 
 class Model:
-    def __init__(self, vertices, triangles, trace, int_res=100
+    def __init__(self, vertices, polygons, trace, int_res=100
                  , isTraceFixed=True, computeSpectrumOnBake=False):
 
         self.isTraceFixed = isTraceFixed
@@ -134,19 +223,25 @@ class Model:
         self._elements = []
 
         self._integrator = Integrator(int_res, open=True)
+        self.int_res = int_res
 
         self.vertices = vertices
-        self.polygons = triangles
-        self.triangles = triangles
+        self.polygons = polygons
         self.L = np.array([[]])
         self.M = np.array([[]])
         self._mask = []
 
-        self.k = 10;
-
         self.eigenvectors = []
         self.eigenvalues = []
         self.computeSpectrumOnBake = computeSpectrumOnBake
+
+        rot = np.array([[0, -1], [1, 0]])
+        for i in range(len(polygons)):
+            p_i = polygons[i]
+            v = vertices[:, p_i]
+
+            if np.dot(rot @ (v[:, 1] - v[:, 0]), v[:, 2] - v[:, 0]) < 0:
+                polygons[i] = [p_i[0], p_i[2], p_i[1]]
 
         self.bake()
 
@@ -166,7 +261,12 @@ class Model:
             self._exclude[self._trace] = True
 
     def _bake_triangles(self):
-        self.triangles = self.polygons
+        triangles = []
+        for I in self.polygons:
+            for i in range(len(I) - 2):
+                triangles.append([I[0], I[i + 1], I[i + 2]])
+
+        self.triangles = triangles
 
     def _bake_matrices(self):
         print("Baking matrices...")
@@ -182,71 +282,37 @@ class Model:
         self._n_elements = n
 
         L = np.zeros([n, n])
-        for i0, i1, i2 in self.polygons:
+        for I in self.polygons:
+            N_v = len(I)
 
-            v = self.vertices[:, [i0, i1, i2]]
+            v = self.vertices[:, I]
             w = klein_to_hyperboloid(v)
             w = translate(barycenter(v)) @ w
             v = hyperboloid_to_klein(w)
 
-            A = np.array([
-                v[:, 1] - v[:, 0],
-                v[:, 2] - v[:, 0]
-            ]).T
-            Jac_F = np.abs(A[0, 0] * A[1, 1] - A[1, 0] * A[0, 1])
+            N = self.int_res ** 2
+            t = np.linspace(0, 1, N+1)
+            dt = 1.0 / N
 
-            X = v[:, 0, np.newaxis] + A @ self._integrator.vertices
+            area = compute_area(v, t, dt)
+            proj = proj_RHS(v, t, dt)
 
-            V0, DV0 = _V(X, v)
-            V1, DV1 = _V(X, np.roll(v, -1, axis=1))
-            V2, DV2 = _V(X, np.roll(v, -2, axis=1))
+            for i in range(N_v):
+                if not self._mask[I[i]]:
+                    continue
 
-            dv = np.power(1 - np.sum(X * X, axis=0), -.5)
+                e_i = self._elements[I[i]]
+                L[e_i, e_i] += np.dot(proj[:, i], proj[:, i]) / area
 
-            G11 = (1 - X[0, :] * X[0, :])
-            G22 = (1 - X[1, :] * X[1, :])
-            G12 = -X[0, :] * X[1, :]
-            g = lambda u: np.array([G11 * u[0, :] + G12 * u[1, :], G12 * u[0, :] + G22 * u[1, :]])
+                for j in range(i + 1, N_v):
+                    if not self._mask[I[j]]:
+                        continue
 
-            e0, e1, e2 = self._elements[i0], self._elements[i1], self._elements[i2]
+                    e_j = self._elements[I[j]]
+                    Lij = np.dot(proj[:, i], proj[:, j]) / area
+                    L[e_i, e_j] += Lij
+                    L[e_j, e_i] += Lij
 
-            if self._mask[i0]:
-                L[e0, e0] += Jac_F * self._integrator.integrate_vector(
-                    np.sum(g(DV0) * DV0, axis=0) * dv
-                )
-
-                if self._mask[i1]:
-                    L01 = Jac_F * self._integrator.integrate_vector(
-                        np.sum(g(DV0) * DV1, axis=0) * dv
-                    )
-                    L[e0, e1] += L01
-                    L[e1, e0] += L01
-
-                if self._mask[i2]:
-                    L02 = Jac_F * self._integrator.integrate_vector(
-                        np.sum(g(DV0) * DV2, axis=0) * dv
-                    )
-                    L[e0, e2] += L02
-                    L[e2, e0] += L02
-
-            if self._mask[i1]:
-                L[e1, e1] += Jac_F * self._integrator.integrate_vector(
-                    np.sum(g(DV1) * DV1, axis=0) * dv
-                )
-
-                if self._mask[i2]:
-                    L12 = Jac_F * self._integrator.integrate_vector(
-                        np.sum(g(DV1) * DV2, axis=0) * dv
-                    )
-                    L[e1, e2] += L12
-                    L[e2, e1] += L12
-
-            if self._mask[i2]:
-                L[e2, e2] += Jac_F * self._integrator.integrate_vector(
-                    np.sum(g(DV2) * DV2, axis=0) * dv
-                )
-
-            #print(L)
 
         self.L = sp.csc_matrix(L)
 
@@ -257,44 +323,17 @@ class Model:
         b = np.zeros(dtype=complex, shape=self._n_elements)
 
         print("Integrating...")
-        for i0, i1, i2 in self.polygons:
-            v = self.vertices[:, [i0, i1, i2]]
+        for I in self.polygons:
+            N_v = len(I)
 
-            v = self.vertices[:, [i0, i1, i2]]
-            w = klein_to_hyperboloid(v)
-            T = translate(barycenter(v))
-            v = hyperboloid_to_klein(T @ w)
+            v = self.vertices[:, I]
+            area = compute_hyperbolic_area(v)
 
-            A = np.array([
-                v[:, 1] - v[:, 0],
-                v[:, 2] - v[:, 0]
-            ]).T
-            F = lambda x: v[:, 0, np.newaxis] + A @ x
-            Jac_F = np.abs(A[0, 0] * A[1, 1] - A[1, 0] * A[0, 1])
+            for i in I:
+                if not self._mask[i]:
+                    continue
 
-            X = F(self._integrator.vertices)
-            Y = klein_to_hyperboloid(X)
-            Y = hyperboloid_to_klein(np.linalg.inv(T) @ Y)
-
-            V0, DV0 = _V(X, v)
-            V1, DV1 = _V(X, np.roll(v, -1, axis=1))
-            V2, DV2 = _V(X, np.roll(v, -2, axis=1))
-
-            _f_dv = f(Y[0, :] + 1j * Y[1, :]) * _dVol_K(X)
-
-            e0, e1, e2 = self._elements[[i0, i1, i2]]
-            if self._mask[i0]:
-                b[e0] += Jac_F * self._integrator.integrate_vector(
-                    V0 * _f_dv
-                )
-            if self._mask[i1]:
-                b[e1] += Jac_F * self._integrator.integrate_vector(
-                    V1 * _f_dv
-                )
-            if self._mask[i2]:
-                b[e2] += Jac_F * self._integrator.integrate_vector(
-                    V2 * _f_dv
-                )
+                b[self._elements[i]] += area / N_v
 
         self._solution = sp.linalg.spsolve(self.L, b)
         u = np.zeros(np.size(self.vertices, axis=1), dtype=complex)
@@ -304,15 +343,8 @@ class Model:
 
     def area(self):
         A = 0
-        for v_i, v_j, v_k in self.polygons:
-            v2 = self.vertices[:, v_i] - self.vertices[:, v_k]
-            v3 = self.vertices[:, v_j] - self.vertices[:, v_i]
-            A += np.abs(-v3[0] * v2[1] + v3[1] * v2[0]) * \
-                self._integrator.integrate(
-                lambda x, y: _dVol(
-                    self.vertices[0, v_i] + x * v3[0] - y * v2[0],
-                    self.vertices[1, v_i] + x * v3[1] - y * v2[1])
-            )
+        for I in self.polygons:
+            A += compute_hyperbolic_area(self.vertices[:, I])
 
         return A
 
@@ -340,7 +372,7 @@ class Model:
 
         norm_error = 0
         norm_soln = 0
-        for i0, i1, i2 in self.polygons:
+        for i0, i1, i2 in self.triangles:
             v = self.vertices[:, [i0, i1, i2]]
             w = klein_to_hyperboloid(v)
             T = translate(barycenter(v))
@@ -357,9 +389,9 @@ class Model:
             Y = klein_to_hyperboloid(X)
             Y = hyperboloid_to_klein(np.linalg.inv(T) @ Y)
 
-            V0, DV0 = _V(X, v)
-            V1, DV1 = _V(X, np.roll(v, -1, axis=1))
-            V2, DV2 = _V(X, np.roll(v, -2, axis=1))
+            V1 = self._integrator.vertices[0, :]
+            V2 = self._integrator.vertices[1, :]
+            V0 = 1 - V1 - V2
 
             e = self._solution[self._elements[[i0, i1, i2]]]
             e[np.logical_not(self._mask[[i0, i1, i2]])] = 0
@@ -378,14 +410,15 @@ class Model:
 
 
 if __name__ == "__main__":
-    vertices, polygons, trace = triangulate.generate(p=3, q=7, iterations=3, subdivisions=2, model="Klein", minimal=True)
+    vertices, polygons, trace = vem_triangulate.vem_mesh(512)
+    vertices = _Phi_DtK(vertices)
     model = Model(vertices, polygons, trace)
 
-    f = lambda z: 1
-    u = np.real(model.solve_poisson(f))
+    #f = lambda z: 1
+    #u = np.real(model.solve_poisson(f))
 
-    ax = plt.figure().add_subplot(projection="3d")
-    plot.surface(ax, model.vertices, model.triangles, u)
-    plot.add_wireframe(ax, model.vertices, model.triangles, u)
-    plt.show()
+    #ax = plt.figure().add_subplot(projection="3d")
+    #plot.surface(ax, model.vertices, model.triangles, u)
+    #plot.add_wireframe(ax, model.vertices, model.triangles, u)
+    #plt.show()
 

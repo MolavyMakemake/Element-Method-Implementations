@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plot, FEM_BKDISK_O1, FEM_BKDISK_O2, FEM_PDISK_O1, FEM_PDISK_O2, triangulate
 import FEM_SIMPLEX_O1, FEM_HOMOGENEOUS_O1, FEM_STAUDTIAN_O1
+import VEM_HOMOGENEOUS_O1, vem_triangulate
 
 
 def distance(x, y):
@@ -73,38 +74,20 @@ _bdry_i = 0
 #for triangulation_f in ["../meshgen/output/triangulation_rect_hyp_180(80).txt",
 #                        "../meshgen/output/triangulation_rect_hyp_560(160).txt",
 #                        "../meshgen/output/triangulation_rect_hyp_1100(200).txt"]:
-for triangulation_f in ["../meshgen/output/triangulation_hyp_256(110).txt",
-                        "../meshgen/output/triangulation_hyp_512(131).txt",
-                        "../meshgen/output/triangulation_hyp_1024(185).txt",
-                        "../meshgen/output/triangulation_hyp_2048(288).txt",
-                        "../meshgen/output/triangulation_hyp_4096(377).txt",
-                        "../meshgen/output/triangulation_hyp_8192(610).txt"]:
-
-    vertices = []
-    triangles = []
-    file = open(triangulation_f)
-    exec(file.read())
-    vertices = np.array(vertices).reshape((len(vertices) // 2, 2)).T
-    file.close()
-
-    boundary = [i for i in range(_bdry_N[_bdry_i], np.size(vertices, axis=1), 1)]
-    _bdry_i += 1
+for N in [256, 512, 1024, 2048, 4096]:
+    vertices, polygons, boundary = triangulate.load(f"./triangulations/uniform_disk_hyp_{N}.npz")
+    vertices_vem, polygons_vem, boundary_vem = vem_triangulate.vem_mesh(N)
 
     vertices_k = triangulate._pdisk_to_bkdisk(vertices)
-    _triangles = []
-    for i in range(0, len(triangles), 3):
-        _triangles.append([triangles[i], triangles[i + 1], triangles[i + 2]])
+    vertices_vem = triangulate._pdisk_to_bkdisk(vertices_vem)
 
     res = 100
     models = [
-        FEM_SIMPLEX_O1.Model(vertices_k, _triangles, boundary, int_res=res),
-        FEM_STAUDTIAN_O1.Model(vertices_k, _triangles, boundary, int_res=res),
-        FEM_HOMOGENEOUS_O1.Model(vertices_k, _triangles, boundary, int_res=res),
-        FEM_BKDISK_O1.Model(vertices_k, _triangles, boundary, int_res=res),
-        FEM_BKDISK_O2.Model(vertices_k, _triangles, boundary, int_res=res)
+        FEM_SIMPLEX_O1.Model(vertices_k, polygons, boundary),
+        VEM_HOMOGENEOUS_O1.Model(vertices_vem, polygons_vem, boundary_vem)
     ]
 
-    h = compute_h(vertices, _triangles)
+    h = compute_h(vertices, polygons)
     for i in range(len(models)):
         u = np.real(models[i].solve_poisson(F[i]))
         H_dof[i].append(models[i]._n_elements)
@@ -123,21 +106,15 @@ for y in Y_g:
 
 if True:
 
-    plt.loglog(H_dof[0], Y_g[0], "o--", color="black", label="Simplex k=1")
-    plt.loglog(H_dof[1], Y_g[1], "<--", color="black", label="Staudtian k=1")
-    plt.loglog(H_dof[2], Y_g[2], "x--", color="black", label="Homogeneous k=1")
-    plt.loglog(H_dof[3], Y_g[3], "o--", color="red", label="Klein k=1")
-    plt.loglog(H_dof[4], Y_g[4], "<--", color="red", label="Klein k=2")
+    plt.loglog(H_dof[0], Y_g[0], "o--", color="black", label="VEM k=1")
+    plt.loglog(H_dof[1], Y_g[1], "o--", color="red", label="Simplex k=1")
     plt.ylabel("Relative error (hyperbolic metric)")
     plt.xlabel("# DOF")
     plt.legend()
     plt.show()
 
-    plt.loglog(H_g[0], Y_g[0], "o--", color="black", label="Simplex k=1")
-    plt.loglog(H_g[1], Y_g[1], "<--", color="black", label="Staudtian k=1")
-    plt.loglog(H_g[2], Y_g[2], "x--", color="black", label="Homogeneous k=1")
-    plt.loglog(H_g[3], Y_g[3], "o--", color="red", label="Klein k=1")
-    plt.loglog(H_g[4], Y_g[4], "<--", color="red", label="Klein k=2")
+    plt.loglog(H_g[0], Y_g[0], "o--", color="black", label="VEM k=1")
+    plt.loglog(H_g[1], Y_g[1], "o--", color="red", label="Simplex k=1")
     plt.ylabel("Relative error (hyperbolic metric)")
     plt.xlabel("Mesh size (hyperbolic metric)")
     plt.legend()

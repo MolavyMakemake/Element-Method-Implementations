@@ -2,53 +2,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from hyperbolic.triangulate import save
 
-def distance(x, y):
-    #return np.sqrt((x - y) @ (x - y))
+X = 2 * np.random.rand(2, 10000) - 1
 
-    _d = 2 * (x - y) @ (x - y) / ((1 - x @ x) * (1 - y @ y))
-    return np.arccosh(1 + _d)
+for i in range(np.size(X, axis=1)):
+    X[:, i] *= X[:, i] @ X[:, i] < 1
 
-vertices = []
-triangles = []
-file = open("./meshgen/output/triangulation_rect_hyp_180(80).txt")
-exec(file.read())
-vertices = np.array(vertices).reshape((len(vertices) // 2, 2)).T
-file.close()
+Y = np.zeros_like(X)
+Y[0, :] = X[0, :] / np.sqrt(1 - X[1, :] * X[1, :])
+Y[1, :] = X[1, :] / np.sqrt(1 - X[0, :] * X[0, :])
 
-R = np.tanh(1.5)
-boundary = []
-for i in range(np.size(vertices, axis=1)):
-    if np.dot(vertices[:, i], vertices[:, i]) > R * R - 1e-5:
-        boundary.append(i)
-
-    #vertices[:, i] *= R
-
-_triangles = []
-for i in range(0, len(triangles), 3):
-    _triangles.append([triangles[i], triangles[i + 1], triangles[i + 2]])
-
-print(len(_triangles))
-
-H = []
-for p_i in _triangles:
-    H.append(max([
-        distance(vertices[:, p_i[0]], vertices[:, p_i[1]]),
-        distance(vertices[:, p_i[1]], vertices[:, p_i[2]]),
-        distance(vertices[:, p_i[2]], vertices[:, p_i[0]])
-    ]))
-
-N = len(H)
-
-h0 = np.min(H)
-w = 0.005
-
-buckets = np.arange(h0, np.max(H), w)
-distribution = np.zeros_like(buckets)
-
-s = 1.0 / N
-for h in H:
-    i = int((h - h0) / w)
-    distribution[i] += s
-
-plt.bar(buckets, distribution, width=w, align="edge")
+plt.scatter(Y[0, :], Y[1, :])
+plt.axis("equal")
 plt.show()
