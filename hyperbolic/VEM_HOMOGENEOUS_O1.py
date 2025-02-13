@@ -24,6 +24,24 @@ def _vec_delta(x, u):
     w2 = np.sum(w * w, axis=0)
     return 1 + 2 * w2 / ((1 - x2) * (1 - u @ u))
 
+def nrm_dst(a, x):
+    b = a / (1 + np.sqrt(1 - np.sum(a * a, axis=0)))
+    y = x / (1 + np.sqrt(1 - np.sum(x * x, axis=0)))
+
+    det = (x[0, :] - a[0, 0]) * (a[1, 2] - a[1, 1]) \
+            - (x[1, :] - a[1, 0]) * (a[0, 2] - a[0, 1])
+    t = ((a[1, 2] - a[1, 1]) * (a[0, 1] - a[0, 0])
+         - (a[0, 2] - a[0, 1]) * (a[1, 1] - a[1, 0])) / det
+
+    x_A = a[:, 0, np.newaxis] + t * (x - a[:, 0, np.newaxis])
+
+    d0 = _vec_delta(y, b[:, 0])
+    d1 = _vec_delta(x_A / (1 + np.sqrt(1 - np.sum(x_A * x_A, axis=0))), b[:, 0])
+
+    f = 1 - np.acosh(d0) / np.acosh(d1)
+    f[np.isnan(f)] = 1
+    return f
+
 def compute_hyperbolic_area(v):
     N_v = np.size(v, axis=1)
 
@@ -389,9 +407,9 @@ class Model:
             Y = klein_to_hyperboloid(X)
             Y = hyperboloid_to_klein(np.linalg.inv(T) @ Y)
 
-            V1 = self._integrator.vertices[0, :]
-            V2 = self._integrator.vertices[1, :]
-            V0 = 1 - V1 - V2
+            V0 = nrm_dst(v, X)
+            V1 = nrm_dst(np.roll(v, -1, axis=1), X)
+            V2 = nrm_dst(np.roll(v, -2, axis=1), X)
 
             e = self._solution[self._elements[[i0, i1, i2]]]
             e[np.logical_not(self._mask[[i0, i1, i2]])] = 0
