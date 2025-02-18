@@ -110,9 +110,6 @@ def _RHS_bdry_int(a, b, t, dt):
     I_v = V * (u1 @ s_dV)
     I = np.sum(I_v * dt) - .5 * I_v[0] * dt
 
-    #plt.plot(t, I_v)
-    #plt.show()
-
     ###
 
     X = a[:, 0, np.newaxis] + np.outer(u2, t)
@@ -159,7 +156,7 @@ def RHS(a, N):
 
 u = np.array([-0.8, .0])
 w = np.array([.2, -0.6])
-v = np.array([.0, -1.0])
+v = np.array([.0, -0.9])
 
 N_samples = []
 I_arr = []

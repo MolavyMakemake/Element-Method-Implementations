@@ -120,6 +120,6 @@ if True:
     ax = plt.axes(projection='3d')
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    ax.scatter(x[0, :], x[1, :], np.arcsinh(y0) + np.arcsinh(y1) + np.arcsinh(y2), s=.4)
+    ax.scatter(x[0, :], x[1, :], y0 / (y0 + y1 + y2), s=.4)
     ax.legend()
     plt.show()

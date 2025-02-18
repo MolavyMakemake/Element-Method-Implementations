@@ -485,8 +485,8 @@ def plot_triangulation(filename):
     ax = fig.add_subplot(xlim=(-1.01, 1.01), ylim=(-1.05, 1.05))
     plt.axis("off")
 
-    #t = np.linspace(0, 2 * np.pi, 60)
-    #plt.plot(np.cos(t), np.sin(t), "--", color="gray", linewidth=.8)
+    t = np.linspace(0, 2 * np.pi, 60)
+    plt.plot(np.cos(t), np.sin(t), "--", color="gray", linewidth=.8)
 
     vertices, polygons, trace = load("./triangulations/" + filename + ".npz")
     plot.add_wireframe(ax, vertices, polygons)
@@ -546,7 +546,7 @@ if __name__ == "__main__":
     plot_triangulation("uniform_disk_hyp_2048")
     plot_triangulation("uniform_disk_hyp_4096")
     plot_triangulation("uniform_disk_hyp_8192")
-    plt.show()
+    #plt.show()
     '''
 
     ax = plt.figure().add_subplot()

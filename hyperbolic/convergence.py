@@ -74,7 +74,7 @@ _bdry_i = 0
 #for triangulation_f in ["../meshgen/output/triangulation_rect_hyp_180(80).txt",
 #                        "../meshgen/output/triangulation_rect_hyp_560(160).txt",
 #                        "../meshgen/output/triangulation_rect_hyp_1100(200).txt"]:
-for N in [256, 512, 1024]:
+for N in [256, 512]:
     vertices, polygons, boundary = triangulate.load(f"./triangulations/uniform_disk_hyp_{N}.npz")
     vertices_vem, polygons_vem, boundary_vem = vem_triangulate.vem_mesh(N)
 
@@ -83,7 +83,7 @@ for N in [256, 512, 1024]:
 
     res = 100
     models = [
-        FEM_SIMPLEX_O1.Model(vertices_k, polygons, boundary),
+        FEM_STAUDTIAN_O1.Model(vertices_k, polygons, boundary),
         VEM_HOMOGENEOUS_O1.Model(vertices_vem, polygons_vem, boundary_vem)
     ]
 

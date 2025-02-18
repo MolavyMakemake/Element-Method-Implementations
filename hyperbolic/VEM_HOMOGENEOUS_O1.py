@@ -38,7 +38,7 @@ def nrm_dst(a, x):
     d0 = _vec_delta(y, b[:, 0])
     d1 = _vec_delta(x_A / (1 + np.sqrt(1 - np.sum(x_A * x_A, axis=0))), b[:, 0])
 
-    f = 1 - np.acosh(d0) / np.acosh(d1)
+    f = 1 - np.arccosh(d0) / np.arccosh(d1)
     f[np.isnan(f)] = 1
     return f
 
@@ -186,38 +186,16 @@ def Jac_hyperboloid_to_klein(x, u):
         -x[1, :] / x[0, :] * u[0, :] - x[2, :] / x[0, :] * u[1, :],
         u[0, :], u[1, :]]) / x[0, :]
 
-def _V(x, a):
-    z = klein_to_hyperboloid(x)
-    b = klein_to_hyperboloid(a)
+def _V(u, v, x):
+    d0 = 1 + 2 * ((u - v) @ (u - v)) / ((1 - u @ u) * (1 - v @ v))
+    d1 = _vec_delta(x, u)
+    d2 = _vec_delta(x, v)
 
-    A = orthomap(b)
-    z = A @ z
-    y = hyperboloid_to_klein(z)
+    A = np.abs(1 - d0 * d0 - d1 * d1 - d2 * d2 + 2 * d0 * d1 * d2)
+    B = 1 + d0 + d1 + d2
 
-    r = y * y
-    S = np.power((1 - r[1, :]) / ((1 - r[0, :]) * (1 - r[0, :] - r[1, :])), .25)
-
-    f = y[0, :] * S
-    m = np.min(f)
-    M = np.max(f)
-    M = M if M > -m else m
-
-    #D1f = -.5 / M * r[0, :] * r[1, :] / (1 - r[0, :]) + 1 - r[1, :]
-    #D2f = .5 / M * y[0, :] * y[1, :] * r[0, :] / (1 - r[1, :])
-    #Dgf = S * np.array([
-    #    (1 - r[0, :]) * D1f - y[0, :] * y[1, :] * D2f,
-    #    (1 - r[1, :]) * D2f - y[0, :] * y[1, :] * D1f
-    #])
-
-    Dgf = S * np.array([
-        1 + .5 * r[0, :] * (1.0 / (1 - r[0, :] - r[1, :]) + 1.0 / (1 - r[0, :])),
-        .5 * y[0, :] * y[1, :] * (1 / (1 - r[0, :] - r[1, :]) - 1 / (1 - r[1, :]))
-    ])
-
-    Dgf = Jac_hyperboloid_to_klein(z, Dgf)
-    Dgf = Jac_klein_to_hyperboloid(x, A.T @ Dgf)
-
-    return f / M, Dgf / M
+    vol = 2 * np.arctan(np.sqrt(A) / B)
+    return vol / np.max(vol)
 
 def _Phi_KtD(x):
     return x / (1 + np.sqrt(1 - np.sum(x * x, axis=0)))
@@ -407,9 +385,12 @@ class Model:
             Y = klein_to_hyperboloid(X)
             Y = hyperboloid_to_klein(np.linalg.inv(T) @ Y)
 
-            V0 = nrm_dst(v, X)
-            V1 = nrm_dst(np.roll(v, -1, axis=1), X)
-            V2 = nrm_dst(np.roll(v, -2, axis=1), X)
+            v_D = _Phi_KtD(v)
+            X_D = _Phi_KtD(X)
+
+            V0 = _V(v_D[:, 1], v_D[:, 2], X_D)
+            V1 = _V(v_D[:, 2], v_D[:, 0], X_D)
+            V2 = _V(v_D[:, 0], v_D[:, 1], X_D)
 
             e = self._solution[self._elements[[i0, i1, i2]]]
             e[np.logical_not(self._mask[[i0, i1, i2]])] = 0

@@ -57,7 +57,7 @@ def _distance(x, y, A):
 
     return dst, D1dst, D2dst
 
-def _V(u, v, x):
+def _staudtian(u, v, x):
     a, D1a, D2a = _distance(x[0, :], x[1, :], u)
     b, D1b, D2b = _distance(x[0, :], x[1, :], v)
     c, _, _ = _distance(u[0], u[1], v)
@@ -80,6 +80,19 @@ def _V(u, v, x):
     M = np.max(S)
 
     return S / M, np.array([D1S, D2S]) / M
+
+def _V(a, x):
+    V0, DV0 = _staudtian(a[:, 1], a[:, 2], x)
+    V1, DV1 = _staudtian(a[:, 2], a[:, 0], x)
+    V2, DV2 = _staudtian(a[:, 0], a[:, 1], x)
+
+    S = V0 + V1 + V2
+    DS = (DV0 + DV1 + DV2) / S
+
+    return V0 / S, V1 / S, V2 / S, \
+           (DV0 - V0 * DS) / S, \
+           (DV1 - V1 * DS) / S, \
+           (DV2 - V2 * DS) / S
 
 def _Phi_KtD(x):
     return x / (1 + np.sqrt(1 - np.sum(x * x, axis=0)))
@@ -169,9 +182,8 @@ class Model:
             X_K = F(self._integrator.vertices)
             X_D = _Phi_KtD(X_K)
 
-            V0, DV0 = _V(v_D[:, 1], v_D[:, 2], X_D)
-            V1, DV1 = _V(v_D[:, 2], v_D[:, 0], X_D)
-            V2, DV2 = _V(v_D[:, 0], v_D[:, 1], X_D)
+            V0, V1, V2, DV0, DV1, DV2 = _V(v_D, X_D)
+
             dv = np.square(1 - np.sum(X_D * X_D, axis=0)) * _dVol_K(X_K) / 4.0
             e0, e1, e2 = self._elements[i0], self._elements[i1], self._elements[i2]
 
@@ -243,9 +255,7 @@ class Model:
             Y = klein_to_hyperboloid(X_K)
             Y = hyperboloid_to_klein(np.linalg.inv(T) @ Y)
 
-            V0, DV0 = _V(v_D[:, 1], v_D[:, 2], X_D)
-            V1, DV1 = _V(v_D[:, 2], v_D[:, 0], X_D)
-            V2, DV2 = _V(v_D[:, 0], v_D[:, 1], X_D)
+            V0, V1, V2, DV0, DV1, DV2 = _V(v_D, X_D)
 
             _f_dv = f(Y[0, :] + 1j * Y[1, :]) * _dVol_K(X_K)
 
@@ -328,9 +338,7 @@ class Model:
 
             X_D = _Phi_KtD(X)
 
-            V0, DV0 = _V(v_D[:, 1], v_D[:, 2], X_D)
-            V1, DV1 = _V(v_D[:, 2], v_D[:, 0], X_D)
-            V2, DV2 = _V(v_D[:, 0], v_D[:, 1], X_D)
+            V0, V1, V2, DV0, DV1, DV2 = _V(v_D, X_D)
 
             e = self._solution[self._elements[[i0, i1, i2]]]
             e[np.logical_not(self._mask[[i0, i1, i2]])] = 0
