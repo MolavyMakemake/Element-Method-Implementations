@@ -44,6 +44,44 @@ def _V(u, v, x):
 
     return vol / M, np.array(DV) / M
 
+def dot(u, v, x):
+    r = x * x
+
+    g11 = 1 - r[1, :]
+    g12 = x[0, :] * x[1, :]
+    g22 = 1 - r[0, :]
+
+    g_u = np.array([g11 * u[0, :] + g12 * u[1, :], g12 * u[0, :] + g22 * u[1, :]])
+    g_v = np.array([g11 * v[0, :] + g12 * v[1, :], g12 * v[0, :] + g22 * v[1, :]])
+
+    V = np.sum(u * g_v, axis=0)
+    d1V =  -g_u[0, :] - g_v[0, :] \
+           + u[0, :] * x[1, :] * v[1, :] \
+           + u[1, :] * (x[1, :] * v[0, :] - 2 * x[0, :] * v[1, :])
+    d2V = -g_u[1, :] - g_v[1, :] \
+          - u[0, :] * (x[0, :] * v[1, :] - 2 * x[1, :] * v[0, :]) \
+          + u[1, :] * x[0, :] * v[0, :]
+
+    return V, d1V, d2V
+
+def _V_ideal(A, B, x):
+    u = A[:, np.newaxis] - x
+    v = B[:, np.newaxis] - x
+
+    uv, d1uv, d2uv = dot(u, v, x)
+    uu, d1uu, d2uu = dot(u, u, x)
+    vv, d1vv, d2vv = dot(v, v, x)
+
+    dnm = np.sqrt(uu * vv)
+    p = uv / dnm
+    d1p = d1uv / dnm - .5 * p / dnm * (d1uu * vv + uu * d1vv)
+    d2p = d2uv / dnm - .5 * p / dnm * (d2uu * vv + uu * d2vv)
+
+    V = np.pi - np.arccos(p)
+    c = np.sqrt(1 - p * p) * V[0]
+    return V / V[0], np.array([d1p, d2p]) / c
+
+
 def _RHS_V(Y, d0, v1, v2, b1, b2):
     Y2 = np.sum(Y * Y, axis=0)
     print(np.max(Y2))
@@ -91,7 +129,8 @@ def _RHS_bdry_int(a, b, t, dt):
     v1 = Y - b[:, 1, np.newaxis]
     v2 = Y - b[:, 2, np.newaxis]
 
-    V, DV = _RHS_V(Y, d0, v1, v2, b1, b2)
+    #V, DV = _RHS_V(Y, d0, v1, v2, b1, b2)
+    V, DV = _V_ideal(a[:, 1], a[:, 2], X)
 
     s = (1 + c) * (1 + c) * c
     g11 = 1.0 - X2[0, :]
@@ -110,6 +149,8 @@ def _RHS_bdry_int(a, b, t, dt):
     I_v = V * (u1 @ s_dV)
     I = np.sum(I_v * dt) - .5 * I_v[0] * dt
 
+    plt.plot(t, I_v)
+    plt.show()
     ###
 
     X = a[:, 0, np.newaxis] + np.outer(u2, t)
@@ -121,7 +162,7 @@ def _RHS_bdry_int(a, b, t, dt):
     v1 = Y - b[:, 1, np.newaxis]
     v2 = Y - b[:, 2, np.newaxis]
 
-    V, DV = _RHS_V(Y, d0, v1, v2, b1, b2)
+    V, DV = _V_ideal(a[:, 1], a[:, 2], X)
 
     s = (1 + c) * (1 + c) * c
     g11 = 1.0 - X2[0, :]
@@ -162,7 +203,7 @@ N_samples = []
 I_arr = []
 J_arr = []
 
-for N in [100]:
+for N in [100, 200, 400, 1000]:
     print("N =", N)
 
     N_t = N * (N + 1) // 4
