@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plot, FEM_BKDISK_O1, FEM_BKDISK_O2, FEM_PDISK_O1, FEM_PDISK_O2, triangulate
 import FEM_SIMPLEX_O1, FEM_HOMOGENEOUS_O1, FEM_STAUDTIAN_O1
-import VEM_HOMOGENEOUS_O1, vem_triangulate
+import VEM_PDISK_O1, vem_triangulate
 
 
 def distance(x, y):

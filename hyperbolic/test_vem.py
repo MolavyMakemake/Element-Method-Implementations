@@ -125,7 +125,7 @@ def compute_stabilizer(v, v0, v1, a0, a1, t, dt):
 u = np.array([
     [-0.5, 0],
     [0, 0.5],
-    [-0.5, 0.2]
+    [0.5, 0.2]
 ]).T
 
 N_samples = []
@@ -159,6 +159,7 @@ for N in [100]:
 
     ax.scatter(u[0, 2], u[1, 2], s=5.6)
 
-    ax.scatter(X[0, :], X[1, :], a[0, 2] * X[0, :] + a[1, 2] * X[1, :], color="b", alpha=0.5, s=.4)
+    Y = a[0, 2] * X[0, :] + a[1, 2] * X[1, :]
+    ax.scatter(X[0, :], X[1, :], Y - np.average(Y), color="b", alpha=0.5, s=.4)
     ax.legend()
     plt.show()

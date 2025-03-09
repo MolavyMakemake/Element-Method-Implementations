@@ -116,19 +116,36 @@ def Int_PP(v, t, dt):
 
     return np.array([[I11, I12], [I12, I22]])
 
-def Int_WP(v, t, dt):
+def Int_WP(v, t):
     dv = np.roll(v, -1, axis=1) - v
 
-    I = np.zeros(shape=(2, np.size(v, axis=1)), dtype=float)
-    for i in range(np.size(v, axis=1)):
+    N_v = np.size(v, axis=1)
+    I = np.zeros(shape=(2, N_v), dtype=float)
+    for i in range(N_v):
         X = v[:, i, np.newaxis] + np.outer(dv[:, i], t)
+
+        h = dst(X[:, :-1], X[:, 1:])
 
         p1, dp1 = V1(X)
         p2, dp2 = V2(X)
 
+        I0 = np.sum(h * (p1[:-1] + p1[1:])) / 2
+        I1 = np.sum(h * (p2[:-1] + p2[1:])) / 2
+
+        I[0, i] += I0
+        I[1, i] += I1
+
+        j = (i + 1) % N_v
+        I[0, j] -= I0
+        I[1, j] -= I1
+
+    return I[:, :-1]
+
+def Int_WV(v):
+    N_v = np.size(v, axis=1)
+    h = dst(v[:, 1:], v[:, :-1])
 
 
-    return I
 
 def star(v, x):
     r = x * x
@@ -141,58 +158,46 @@ def star(v, x):
     ]) / np.sqrt(1 - r[0, :] - r[1, :])
 
 
-u = np.array([-.5, .8])
-v = np.array([-.8, 0.1])
-w = np.array([.5, -.2])
+v = np.array([
+    [-.3, .8],
+    [-.8, 0.1],
+    [.5, -.2]
+]).T
 
-N_samples = []
-I = []
-J = []
+N = 1000
+dt = 1 / N
+t = np.linspace(0, 1, N+1)
 
-for N in [100, 200, 300, 400]:
-    print("N =",N)
+I_wp = Int_WP(v, t)
+I_pp = Int_PP(v, t, dt)
 
-    N_t = N * (N + 1) // 6
-    dt = 1 / N_t
-    t = np.linspace(0, 1, N_t+1)
+X = Integrator(100).vertices
+X = v[:, 0, np.newaxis] + np.array([
+    v[:, 1] - v[:, 0], v[:, 2] - v[:, 0]
+]).T @ X
 
-    ###
+fig = plt.figure()
+ax = plt.axes(projection='3d')
+ax.set_xlabel("x")
+ax.set_ylabel("y")
 
-    _int = Integrator(N)
-    A = np.array([v - u, w - u]).T
-    X = u[:, np.newaxis] + A @ _int.vertices
+b = np.linalg.inv(I_pp) @ I_wp
 
-    f1, df1 = V1(X)
-    f2, df2 = V2(X)
-    dv = np.power(1 - np.sum(X * X, axis=0), -.5)
+print(b @ I_wp.T)
 
-    g11 = 1 - X[0, :] * X[0, :]
-    g12 = -X[0, :] * X[1, :]
-    g22 = 1 - X[1, :] * X[1, :]
-    p = np.sum(df1 * np.array([
-        g11 * df1[0, :] + g12 * df1[1, :],
-        g12 * df1[0, :] + g22 * df1[1, :]
-    ]), axis=0)
+h = dst(v, np.roll(v, -1, axis=1)) / 2
+a = np.linalg.solve(b.T @ I_wp, np.array([h[0] - h[-1], -h[0]]))
 
-    _Y = X / (1 + np.sqrt(1 - np.sum(X * X, axis=0)))
+a = b @ a
+print(a)
 
-    _I = np.abs(A[0, 0] * A[1, 1] - A[1, 0] * A[0, 1]) \
-         * _int.integrate_vector(p * dv)
+for i in range(np.size(v, axis=1)):
+    ax.scatter(v[0, i], v[1, i], s=0.6)
 
-    ###
+ax.scatter(v[0, 0], v[1, 0], s=5.6)
 
+Y = a[0] * X[0, :] + a[1] * X[1, :]
 
-    _J = Int_PP(np.array([u, v, w]).T, t, dt)
-
-    N_samples.append(N * (N + 1) // 2)
-    I.append(_I)
-    J.append(_J[0, 0])
-
-plt.plot(N_samples, I, "o--", label="interior integral")
-plt.plot(N_samples, J, "o--", label="path integral")
-
-plt.xlabel("nr. samples")
-plt.ylabel("out")
-plt.legend()
-
+ax.scatter(X[0, :], X[1, :], Y - np.average(Y), color="b", alpha=0.5, s=.4)
+ax.legend()
 plt.show()

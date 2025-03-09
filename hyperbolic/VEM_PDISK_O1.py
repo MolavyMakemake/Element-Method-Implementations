@@ -392,6 +392,8 @@ class Model:
             V1 = _V(v_D[:, 2], v_D[:, 0], X_D)
             V2 = _V(v_D[:, 0], v_D[:, 1], X_D)
 
+            # ADD norm_dst / (avg_nd)
+
             e = self._solution[self._elements[[i0, i1, i2]]]
             e[np.logical_not(self._mask[[i0, i1, i2]])] = 0
 

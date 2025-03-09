@@ -203,7 +203,7 @@ N_samples = []
 I_arr = []
 J_arr = []
 
-for N in [100, 200, 400, 1000]:
+for N in [100]:
     print("N =", N)
 
     N_t = N * (N + 1) // 4
