@@ -86,7 +86,7 @@ def D1V(x):
     return 2 * V / (1 + V*V) * (a / A - b / B)
     #return D1d1
 
-F = nrm_dst(np.array([[0.5, 0], u, v]).T, X)
+F = nrm_dst(np.roll(np.array([[0.5, 0], u, v]).T, -1, axis=1), X)
 DF = np.gradient(np.reshape(F, (res, res)), dx, dy)
 
 k = .5 * (1 - _X0 * _X0 - _X1 * _X1)
@@ -101,10 +101,10 @@ ax.set_ylabel("y")
 
 print(np.sum(np.isnan(F)))
 
-ax.plot_surface(_X0, _X1, np.clip(LgF, -1, 1), label="f_1")
-#ax.plot_surface(_X0, _X1, np.reshape(F, (res, res)), label="f_1")
-ax.scatter(u[0], u[1])
-ax.scatter(v[0], v[1])
+#ax.plot_surface(_X0, _X1, np.clip(LgF, -1, 1), label="f_1")
+ax.plot_surface(_X0, _X1, np.reshape(F, (res, res)), label="f_1")
+ax.scatter(u[0], u[1], color="red")
+ax.scatter(v[0], v[1], color="black")
 #ax.scatter(X[0, :], X[1, :], D1V(X), s=0.1, color="yellow")
 #ax.plot_surface(_X0, _X1, np.clip(np.reshape(D1V(X), (res, res)), -1, 1), label="f_1")
 #ax.plot_surface(X, Y, k * k * DF[1], label="f_2")

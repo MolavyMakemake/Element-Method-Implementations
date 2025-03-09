@@ -141,11 +141,18 @@ def Int_WP(v, t):
 
     return I[:, :-1]
 
-def Int_WV(v):
+def Int_VW(v):
     N_v = np.size(v, axis=1)
-    h = dst(v[:, 1:], v[:, :-1])
+    h = dst(v, np.roll(v, -1, axis=1)) / 2
 
+    I = np.zeros(shape=(N_v - 1, N_v), dtype=float)
+    i = np.arange(0, N_v - 1)
 
+    I[i, i] = h[i] - h[i - 1]
+    I[i[1:], i[:-1]] = -h[i[:-1]]
+    I[i, i+1] = h[i]
+    I[0, -1] = -h[-1]
+    return I
 
 def star(v, x):
     r = x * x
@@ -170,6 +177,7 @@ t = np.linspace(0, 1, N+1)
 
 I_wp = Int_WP(v, t)
 I_pp = Int_PP(v, t, dt)
+I_vw = Int_VW(v)
 
 X = Integrator(100).vertices
 X = v[:, 0, np.newaxis] + np.array([
@@ -183,18 +191,17 @@ ax.set_ylabel("y")
 
 b = np.linalg.inv(I_pp) @ I_wp
 
-print(b @ I_wp.T)
-
 h = dst(v, np.roll(v, -1, axis=1)) / 2
-a = np.linalg.solve(b.T @ I_wp, np.array([h[0] - h[-1], -h[0]]))
+a = np.linalg.inv(b.T @ I_wp) @ I_vw
 
-a = b @ a
 print(a)
+
+a = b @ a[:, 2]
 
 for i in range(np.size(v, axis=1)):
     ax.scatter(v[0, i], v[1, i], s=0.6)
 
-ax.scatter(v[0, 0], v[1, 0], s=5.6)
+ax.scatter(v[0, 1], v[1, 1], s=5.6)
 
 Y = a[0] * X[0, :] + a[1] * X[1, :]
 

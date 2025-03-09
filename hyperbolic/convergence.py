@@ -84,7 +84,7 @@ for N in [256, 512]:
     res = 100
     models = [
         FEM_STAUDTIAN_O1.Model(vertices_k, polygons, boundary),
-        VEM_HOMOGENEOUS_O1.Model(vertices_vem, polygons_vem, boundary_vem)
+        VEM_PDISK_O1.Model(vertices_vem, polygons_vem, boundary_vem)
     ]
 
     h = compute_h(vertices, polygons)
