@@ -118,40 +118,41 @@ def Int_PP(v, t, dt):
 
 def Int_WP(v, t):
     dv = np.roll(v, -1, axis=1) - v
+    h = dst(v, np.roll(v, -1, axis=1))
 
     N_v = np.size(v, axis=1)
     I = np.zeros(shape=(2, N_v), dtype=float)
     for i in range(N_v):
         X = v[:, i, np.newaxis] + np.outer(dv[:, i], t)
 
-        h = dst(X[:, :-1], X[:, 1:])
+        ds = dst(X[:, :-1], X[:, 1:])
 
         p1, dp1 = V1(X)
         p2, dp2 = V2(X)
 
-        I0 = np.sum(h * (p1[:-1] + p1[1:])) / 2
-        I1 = np.sum(h * (p2[:-1] + p2[1:])) / 2
-
-        I[0, i] += I0
-        I[1, i] += I1
+        I0 = np.sum(ds * (p1[:-1] + p1[1:])) / 2
+        I1 = np.sum(ds * (p2[:-1] + p2[1:])) / 2
 
         j = (i + 1) % N_v
-        I[0, j] -= I0
-        I[1, j] -= I1
+
+        I[0, i] += I0 * h[i-1]
+        I[1, i] += I1 * h[i-1]
+
+        I[0, j] -= I0 * h[j]
+        I[1, j] -= I1 * h[j]
 
     return I[:, :-1]
 
 def Int_VW(v):
     N_v = np.size(v, axis=1)
-    h = dst(v, np.roll(v, -1, axis=1)) / 2
+    h = dst(v, np.roll(v, -1, axis=1))
 
     I = np.zeros(shape=(N_v - 1, N_v), dtype=float)
     i = np.arange(0, N_v - 1)
 
-    I[i, i] = h[i] - h[i - 1]
-    I[i[1:], i[:-1]] = -h[i[:-1]]
-    I[i, i+1] = h[i]
-    I[0, -1] = -h[-1]
+    I[i[1:], i[:-1]] = -h[i[:-1]] * h[i[1:]] / 2
+    I[i, i+1] = h[i] * h[i-1] / 2
+    I[0, -1] = -h[0] * h[-1] / 2
     return I
 
 def star(v, x):
@@ -168,7 +169,7 @@ def star(v, x):
 v = np.array([
     [-.3, .8],
     [-.8, 0.1],
-    [.5, -.2]
+    [.3, -.2]
 ]).T
 
 N = 1000
@@ -189,19 +190,26 @@ ax = plt.axes(projection='3d')
 ax.set_xlabel("x")
 ax.set_ylabel("y")
 
-b = np.linalg.inv(I_pp) @ I_wp
+proj_P = np.linalg.inv(I_pp) @ I_wp
 
-h = dst(v, np.roll(v, -1, axis=1)) / 2
-a = np.linalg.inv(b.T @ I_wp) @ I_vw
+h = dst(v, np.roll(v, -1, axis=1)) / np.sqrt(2)
+a = np.linalg.lstsq(proj_P.T @ I_wp, I_vw)[0]
 
-print(a)
+print(I_vw)
+print(np.array([
+    [0, -h[0] * h[1]],
+    [h[0] * h[2], 0],
+    [-h[0] * h[2], h[0] * h[1]]
+]).T)
 
-a = b @ a[:, 2]
+I = 1
+a = proj_P @ a[:, I]
+
 
 for i in range(np.size(v, axis=1)):
     ax.scatter(v[0, i], v[1, i], s=0.6)
 
-ax.scatter(v[0, 1], v[1, 1], s=5.6)
+ax.scatter(v[0, I], v[1, I], s=5.6)
 
 Y = a[0] * X[0, :] + a[1] * X[1, :]
 

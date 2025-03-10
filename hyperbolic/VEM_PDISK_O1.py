@@ -410,11 +410,11 @@ if __name__ == "__main__":
     vertices = _Phi_DtK(vertices)
     model = Model(vertices, polygons, trace)
 
-    #f = lambda z: 1
-    #u = np.real(model.solve_poisson(f))
+    f = lambda z: 1
+    u = np.real(model.solve_poisson(f))
 
-    #ax = plt.figure().add_subplot(projection="3d")
-    #plot.surface(ax, model.vertices, model.triangles, u)
-    #plot.add_wireframe(ax, model.vertices, model.triangles, u)
-    #plt.show()
+    ax = plt.figure().add_subplot(projection="3d")
+    plot.surface(ax, model.vertices, model.triangles, u)
+    plot.add_wireframe(ax, model.vertices, model.triangles, u)
+    plt.show()
 

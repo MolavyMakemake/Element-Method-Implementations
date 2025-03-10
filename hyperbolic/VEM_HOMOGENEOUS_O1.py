@@ -85,46 +85,135 @@ def compute_area(v, t, dt):
 
     return I
 
-def proj_RHS(v, t, dt):
-    v_1 = np.roll(v, -1, axis=1)
-    dv = v_1 - v
+def V1(x):
+    r = x * x
+    t = np.sqrt(1 - r[0, :] - r[1, :])
+    s = np.sqrt(t * (1 + t))
+
+    return x[0, :] / s, np.array([
+        t * (1 + t) + r[0, :] * (.5 / t + 1),
+        x[0, :] * x[1, :] * (.5 / t + 1)]) / (s * s * s)
+
+def V2(x):
+    r = x * x
+    t = np.sqrt(1 - r[0, :] - r[1, :])
+    s = np.sqrt(t * (1 + t))
+
+    return x[1, :] / s, np.array([
+        x[0, :] * x[1, :] * (.5 / t + 1),
+        t * (1 + t) + r[1, :] * (.5 / t + 1)]) / (s * s * s)
+
+def dst(x0, x1):
+    y0 = x0 / (1 + np.sqrt(1 - np.sum(x0 * x0, axis=0)))
+    y1 = x1 / (1 + np.sqrt(1 - np.sum(x1 * x1, axis=0)))
+
+    delta = 1 + 2 * np.sum((y0 - y1) * (y0 - y1), axis=0) \
+            / ((1 - np.sum(y0 * y0, axis=0)) * (1 - np.sum(y1 * y1, axis=0)))
+
+    return np.arccosh(delta)
+
+def W(x):
+    r = x * x
+    t = np.sqrt(1 - r[0, :] - r[1, :])
+
+    return 2 / (t * t * (1 + t)) * x
+
+def star(v, x):
+    r = x * x
+    g11 = 1 - r[0, :]
+    g12 = -x[0, :] * x[1, :]
+    g22 = 1 - r[1, :]
+    return np.array([
+        -g12 * v[0, :] - g22 * v[1, :],
+        g11 * v[0, :] + g12 * v[1, :]
+    ]) / np.sqrt(1 - r[0, :] - r[1, :])
+
+def Int_PP(v, t, dt):
+    dv = np.roll(v, -1, axis=1) - v
+
+    area = compute_hyperbolic_area(v)
+
+    I11 = area / 2
+    I12 = 0
+    I22 = area / 2
+    for i in range(np.size(v, axis=1)):
+        X = v[:, i, np.newaxis] + np.outer(dv[:, i], t)
+
+        p1, dp1 = V1(X)
+        p2, dp2 = V2(X)
+
+        sW = star(W(X), X)
+
+        c = np.sqrt(1.0 - np.sum(X * X, axis=0))
+        Y = X / (1 + c)
+        r = Y * Y
+
+        dx = np.array([1 / (1 + c) + r[0, :] / c, Y[0, :] * Y[1, :] / c])
+        dy = np.array([Y[0, :] * Y[1, :] / c, 1 / (1 + c) + r[1, :] / c])
+
+        I11_v = (1 / 16) * dv[:, i] @ sW * p1 * p1
+        I12_v = (1 / 16) * dv[:, i] @ sW * p1 * p2
+        I22_v = (1 / 16) * dv[:, i] @ sW * p2 * p2
+
+        s = 1.0 / np.sqrt(1 - r)
+        I11_v += .5 * dv[:, i] @ dx * (X[1, :] / c - 2 * s[0, :] * np.arctanh(s[0, :] * Y[1, :]))
+        I12_v += .5 * dv[:, i] @ dy * X[1, :] / c
+        I22_v -= .5 * dv[:, i] @ dy * (X[0, :] / c - 2 * s[1, :] * np.arctanh(s[1, :] * Y[0, :]))
+
+        I11 += np.sum(I11_v * dt) - .5 * (I11_v[0] + I11_v[-1]) * dt
+        I12 += np.sum(I12_v * dt) - .5 * (I12_v[0] + I12_v[-1]) * dt
+        I22 += np.sum(I22_v * dt) - .5 * (I22_v[0] + I22_v[-1]) * dt
+
+    return np.array([[I11, I12], [I12, I22]])
+
+def Int_WP(v, t):
+    dv = np.roll(v, -1, axis=1) - v
+    h = dst(v, np.roll(v, -1, axis=1))
 
     N_v = np.size(v, axis=1)
     I = np.zeros(shape=(2, N_v), dtype=float)
-
     for i in range(N_v):
         X = v[:, i, np.newaxis] + np.outer(dv[:, i], t)
-        r = X * X
-        c = np.sqrt(1.0 - np.sum(r, axis=0))
 
-        Y = X / (1 + c)
+        ds = dst(X[:, :-1], X[:, 1:])
 
-        dx = np.array([
-            1 / (1 + c) + Y[0, :] * Y[0, :] / c,
-            Y[0, :] * Y[1, :] / c
-        ])
-        dy = np.array([
-            Y[0, :] * Y[1, :] / c,
-            1 / (1 + c) + Y[1, :] * Y[1, :] / c
-        ])
+        p1, dp1 = V1(X)
+        p2, dp2 = V2(X)
 
-        e = np.arccosh(_vec_delta(Y, v[:, i] / (1 + np.sqrt(1 - v[:, i] @ v[:, i]))))
-        e /= e[-1]
-
-        I0_v = dv[:, i] @ dy * (1 - e)
-        I1_v = -dv[:, i] @ dx * (1 - e)
-
-        I[0, i] += np.sum(I0_v * dt) - .5 * (I0_v[0] + I0_v[-1]) * dt
-        I[1, i] += np.sum(I1_v * dt) - .5 * (I1_v[0] + I1_v[-1]) * dt
+        I0 = np.sum(ds * (p1[:-1] + p1[1:])) / 2
+        I1 = np.sum(ds * (p2[:-1] + p2[1:])) / 2
 
         j = (i + 1) % N_v
-        J0_v = dv[:, i] @ dy * e
-        J1_v = -dv[:, i] @ dx * e
 
-        I[0, j] += np.sum(J0_v * dt) - .5 * (J0_v[0] + J0_v[-1]) * dt
-        I[1, j] += np.sum(J1_v * dt) - .5 * (J1_v[0] + J1_v[-1]) * dt
+        I[0, i] += I0 * h[i-1]
+        I[1, i] += I1 * h[i-1]
 
+        I[0, j] -= I0 * h[j]
+        I[1, j] -= I1 * h[j]
+
+    return I[:, :-1]
+
+def Int_VW(v):
+    N_v = np.size(v, axis=1)
+    h = dst(v, np.roll(v, -1, axis=1))
+
+    I = np.zeros(shape=(N_v - 1, N_v), dtype=float)
+    i = np.arange(0, N_v - 1)
+
+    I[i[1:], i[:-1]] = -h[i[:-1]] * h[i[1:]] / 2
+    I[i, i+1] = h[i] * h[i-1] / 2
+    I[0, -1] = -h[0] * h[-1] / 2
     return I
+
+def proj_RHS(v, t, dt):
+    I_wp = Int_WP(v, t)
+    I_pp = Int_PP(v, t, dt)
+    I_vw = Int_VW(v)
+
+    proj_P = np.linalg.inv(I_pp) @ I_wp
+
+    return np.linalg.solve(proj_P.T @ I_wp, I_vw), I_vw
+    #return np.linalg.lstsq(proj_P.T @ I_wp, I_vw)[0], I_vw
 
 
 _BC_INTEGRATOR = Integrator(20)
@@ -290,25 +379,23 @@ class Model:
             t = np.linspace(0, 1, N+1)
             dt = 1.0 / N
 
-            area = compute_area(v, t, dt)
-            proj = proj_RHS(v, t, dt)
+            proj_W, I_vw = proj_RHS(v, t, dt)
 
             for i in range(N_v):
                 if not self._mask[I[i]]:
                     continue
 
                 e_i = self._elements[I[i]]
-                L[e_i, e_i] += np.dot(proj[:, i], proj[:, i]) / area
+                L[e_i, e_i] += np.dot(I_vw[:, i], proj_W[:, i])
 
                 for j in range(i + 1, N_v):
                     if not self._mask[I[j]]:
                         continue
 
                     e_j = self._elements[I[j]]
-                    Lij = np.dot(proj[:, i], proj[:, j]) / area
+                    Lij = np.dot(I_vw[:, i], proj_W[:, j])
                     L[e_i, e_j] += Lij
                     L[e_j, e_i] += Lij
-
 
         self.L = sp.csc_matrix(L)
 
@@ -406,15 +493,14 @@ class Model:
 
 
 if __name__ == "__main__":
-    vertices, polygons, trace = vem_triangulate.vem_mesh(512)
-    vertices = _Phi_DtK(vertices)
+    vertices, polygons, trace = triangulate.generate(p=3, q=7, iterations=3, subdivisions=2, model="Klein")
     model = Model(vertices, polygons, trace)
 
-    #f = lambda z: 1
-    #u = np.real(model.solve_poisson(f))
+    f = lambda z: 1
+    u = np.real(model.solve_poisson(f))
 
-    #ax = plt.figure().add_subplot(projection="3d")
-    #plot.surface(ax, model.vertices, model.triangles, u)
-    #plot.add_wireframe(ax, model.vertices, model.triangles, u)
-    #plt.show()
+    ax = plt.figure().add_subplot(projection="3d")
+    plot.surface(ax, model.vertices, model.triangles, u)
+    plot.add_wireframe(ax, model.vertices, model.triangles, u)
+    plt.show()
 

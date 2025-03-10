@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plot, FEM_BKDISK_O1, FEM_BKDISK_O2, FEM_PDISK_O1, FEM_PDISK_O2, triangulate
 import FEM_SIMPLEX_O1, FEM_HOMOGENEOUS_O1, FEM_STAUDTIAN_O1
-import VEM_PDISK_O1, vem_triangulate
+import VEM_PDISK_O1, VEM_HOMOGENEOUS_O1, vem_triangulate
 
 
 def distance(x, y):
@@ -74,7 +74,7 @@ _bdry_i = 0
 #for triangulation_f in ["../meshgen/output/triangulation_rect_hyp_180(80).txt",
 #                        "../meshgen/output/triangulation_rect_hyp_560(160).txt",
 #                        "../meshgen/output/triangulation_rect_hyp_1100(200).txt"]:
-for N in [256, 512]:
+for N in [256, 512, 1024, 2048, 4096, 8192]:
     vertices, polygons, boundary = triangulate.load(f"./triangulations/uniform_disk_hyp_{N}.npz")
     vertices_vem, polygons_vem, boundary_vem = vem_triangulate.vem_mesh(N)
 
@@ -84,7 +84,9 @@ for N in [256, 512]:
     res = 100
     models = [
         FEM_STAUDTIAN_O1.Model(vertices_k, polygons, boundary),
-        VEM_PDISK_O1.Model(vertices_vem, polygons_vem, boundary_vem)
+        FEM_SIMPLEX_O1.Model(vertices_k, polygons, boundary),
+        VEM_PDISK_O1.Model(vertices_vem, polygons_vem, boundary_vem),
+        VEM_HOMOGENEOUS_O1.Model(vertices_k, polygons, boundary)
     ]
 
     h = compute_h(vertices, polygons)
