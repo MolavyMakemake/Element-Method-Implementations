@@ -43,7 +43,7 @@ fig = plt.figure(figsize=plt.figaspect(1.0))
 for i in range(len(models)):
     u = np.real(models[i].solve_poisson(f[i]))
     r = vertices_k * vertices_k
-    u -= (W2 - r[0, :]) * (W2 - r[1, :])
+    #u -= (W2 - r[0, :]) * (W2 - r[1, :])
 
     ax = fig.add_subplot(2, 2, i+1, projection="3d")
     ax.set_title(labels[i])

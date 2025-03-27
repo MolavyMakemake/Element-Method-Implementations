@@ -197,7 +197,9 @@ class Model:
 
 
 if __name__ == "__main__":
-    vertices, polygons, trace = triangulate.generate(p=3, q=7, iterations=3, subdivisions=2, model="Poincare")
+    vertices, polygons, trace = triangulate.load("./triangulations/uniform_disk_euc_256.npz")
+    vertices *= np.tanh(1.5)
+
     model = Model(vertices, polygons, trace)
 
     f = lambda z: 1

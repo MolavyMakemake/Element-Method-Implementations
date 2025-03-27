@@ -322,104 +322,6 @@ def retract(vertices, polygons, trace, dVol):
 
     return vertices, polygons, trace
 
-def force_disk(vertices, polygons, trace, r):
-    vertices_mask = np.zeros(shape=np.size(vertices, axis=1), dtype=bool)
-    for p_i in polygons:
-        if np.any(np.sum(vertices[:, p_i] * vertices[:, p_i], axis=0) < r * r):
-            vertices_mask[p_i] = True
-
-    vertices, polygons, trace = trim_vertices(vertices, polygons, trace, vertices_mask)
-    for i in trace:
-        vertices[:, i] *= r / np.sqrt(vertices[:, i] @ vertices[:, i])
-
-    return vertices, polygons, trace
-
-def force_rect(vertices, polygons, trace, r, threshold=1e-1, debug=True):
-    trace_mask = np.zeros(shape=np.size(vertices, axis=1), dtype=bool)
-    trace_mask[trace] = True
-
-    I = 0
-    vertices_mask = np.zeros(shape=np.size(vertices, axis=1), dtype=bool)
-    while I < len(polygons):
-        p_i = polygons[I]
-        sample = [vertices[:, i] for i in p_i]
-        sample.extend([
-            .5 * (sample[0] + sample[1]),
-            .5 * (sample[1] + sample[2]),
-            .5 * (sample[2] + sample[0])
-        ])
-
-        if any([np.max(np.abs(v)) < r for v in sample]):
-            vertices_mask[p_i] = True
-            I += 1
-        else:
-            trace_mask[p_i] = True
-            polygons.pop(I)
-
-    trace = [i for i in range(len(trace_mask)) if trace_mask[i]]
-    vertices, polygons, trace = trim_vertices(vertices, polygons, trace, vertices_mask)
-
-    trace_mask = np.zeros(shape=np.size(vertices, axis=1), dtype=bool)
-    trace_mask[trace] = True
-    vert_nbh = [[] for _ in range(np.size(vertices, axis=1))]
-    for p_i in polygons:
-        for i in p_i:
-            if trace_mask[i]:
-                vert_nbh[i].append(p_i)
-
-    _int = Integrator.Integrator(100)
-    _vert = np.zeros(shape=(2, len(trace)), dtype=float)
-    for I in range(len(trace)):
-        v0 = np.copy(vertices[:, trace[I]])
-        v = np.copy(v0)
-        for _ in range(20):
-            if np.max(np.abs(v)) < r + threshold:
-                break
-
-            v = _midpoint(vertices, vert_nbh[trace[I]], _int, lambda x, y: np.power(1 - x*x - y*y, -1.5))
-            vertices[:, trace[I]] = v
-
-        _vert[:, I] = v
-        vertices[:, trace[I]] = v0
-
-    vertices[:, trace] = _vert
-
-    if debug:
-        plt.plot([-r, r, r, -r, -r], [r, r, -r, -r, r])
-        return vertices, polygons, trace
-
-    for i in trace:
-        a, b = np.abs(vertices[:, i])
-        if a > r and b > r:
-            vertices[0, i] *= r / a
-            vertices[1, i] *= r / b
-        elif a > b:
-            vertices[0, i] *= r / a
-        else:
-            vertices[1, i] *= r / b
-
-    fixed_points = [
-        np.array([-r,  r]),
-        np.array([ r,  r]),
-        np.array([-r, -r]),
-        np.array([ r, -r])
-    ]
-    fp_d = [1e10 for _ in fixed_points]
-    fp_i = [0 for _ in fixed_points]
-    for i in trace:
-        v = vertices[:, i]
-        for j in range(len(fixed_points)):
-            w = fixed_points[j]
-            _d = (v - w) @ (v - w)
-            if _d < fp_d[j]:
-                fp_d[j] = _d
-                fp_i[j] = i
-
-    for i in range(len(fixed_points)):
-        vertices[:, fp_i[i]] = fixed_points[i]
-
-    return vertices, polygons, trace
-
 def _fix_area(vertices, polygons, trace, threshold = 1e-2):
     print("Checking area...")
     integrator = Integrator.Integrator(100)
@@ -457,29 +359,6 @@ def _fix_area(vertices, polygons, trace, threshold = 1e-2):
     else:
         return trim_vertices(vertices, polygons, trace, vertices_mask)
 
-def rect(h):
-    N = int(2 / h) + 1
-    vertices = np.zeros([2, N * N])
-
-    X, Y = np.meshgrid(np.linspace(-1, 1, N), np.linspace(-1, 1, N))
-    vertices[0, :] = X.flatten()
-    vertices[1, :] = Y.flatten()
-
-    polygons = []
-    for y_i in range(N - 1):
-        for x_i in range(N - 1):
-            i = N * y_i + x_i
-            polygons.append([i, i + N + 1, i + N])
-            polygons.append([i, i + 1, i + N + 1])
-
-    trace = []
-    trace.extend(range(N))
-    trace.extend(range(N * (N - 1), N * N))
-    trace.extend(range(N, N * (N - 1), N))
-    trace.extend(range(2 * N - 1, N * N - 1, N))
-
-    return vertices, polygons, trace
-
 def plot_triangulation(filename):
     fig = plt.figure(figsize=plt.figaspect(1.0))
     ax = fig.add_subplot(xlim=(-1.01, 1.01), ylim=(-1.05, 1.05))
@@ -497,47 +376,6 @@ def plot_triangulation(filename):
 
     extent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
     plt.savefig("./figures/" + filename + ".png", dpi=300, bbox_inches=extent, transparent=True)
-
-def _generate_uniform_rect(R, n_it, n_sd):
-    W = R / np.sqrt(2)
-
-    def _sieve(x):
-        return x @ x > R * R
-
-    vertices, _polygons, trace = generate(4, 5, iterations=n_it, subdivisions=n_sd,
-                                          model="Klein", minimal=False, sieve=_sieve)
-
-    _vert = []
-    n = np.size(vertices, axis=1)
-    polygons = []
-    _int = Integrator.Integrator(100)
-    _dVol = lambda x, y: np.power(1 - x * x - y * y, -1.5)
-    for i0, i1, i2, i3 in _polygons:
-        m0 = _midpoint_bkdisk(vertices[:, i0], vertices[:, i1])
-        m1 = _midpoint_bkdisk(vertices[:, i2], vertices[:, i3])
-
-        c = _midpoint(
-            vertices=vertices[:, [i0, i1, i2, i3]],
-            triangles=[[0, 1, 2], [0, 2, 3]],
-            _int=_int, _dVol=_dVol
-        )
-        polygons.extend([
-            [i0, i1, n],
-            [i1, i2, n],
-            [i2, i3, n],
-            [i3, i0, n]
-        ])
-
-        _vert.append(c)
-        n += 1
-
-    vertices = np.append(vertices, np.array(_vert).T, axis=1)
-    vertices, polygons, trace = force_rect(vertices, polygons, trace, W, 1e-2, debug=False)
-
-    vertices = _bkdisk_to_pdisk(vertices)
-    vertices, polygons, trace = _fix_area(vertices, polygons, trace, 1e-10)
-
-    return vertices, polygons, trace
 
 if __name__ == "__main__":
     plot_triangulation("uniform_disk_hyp_256")

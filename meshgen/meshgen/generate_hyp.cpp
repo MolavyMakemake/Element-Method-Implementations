@@ -63,34 +63,73 @@ namespace {
         std::vector<double> vertices;
 
         N_boundary = std::min(N_vertices * N_vertices, N_boundary);
-        vertices.reserve(2 * (N_vertices * N_vertices + 4 * N_boundary));
+        vertices.reserve(2 * (N_vertices + 4 * N_boundary));
 
         double r = glm::tanh(radius);
+        double w = r / glm::sqrt(2.);
 
-        double d = 2.0 * r / (N_vertices + 1.0);
-        for (int i = 0; i < N_vertices * N_vertices; i++) {
-            int x = i % N_vertices;
-            int y = i / N_vertices;
-            vertices.push_back(-r + d * (x + 1.0));
-            vertices.push_back(-r + d * (y + 1.0));
+        double pi = 2 * glm::pi<double>();
+        double A_rect = pi - 4 * glm::acos(cos_a(-w, 0, 0, -w, w, w));
+        double A_disk = pi * (glm::cosh(radius) - 1);
+
+        double A = A_disk / A_rect;
+        std::vector<double> vertices_sphere = sphere((int)(A * N_vertices), (int)(A * N_boundary), radius);
+
+        double d = 2.0 * w / (N_vertices + 1.0);
+        for (int i = 0; i < vertices_sphere.size(); i += 2) {
+            double x = vertices_sphere[i + 0];
+            double y = vertices_sphere[i + 1];
+
+            double t = 2.0 / (1 + x * x + y * y);
+            x *= t;
+            y *= t;
+
+            if (glm::abs(x) < w && glm::abs(y) < w) {
+                vertices.push_back(x);
+                vertices.push_back(y);
+            }
         }
 
-        d = 2.0 * r / N_boundary;
-        for (int i = 0; i < N_boundary; i++) {
-            double t = 2.0 * i / N_boundary - 1;
-            t = glm::sign(t) * glm::sqrt(glm::abs(t));
+        double t0 = -w;
+        double l = dst_k(-w, w, w, w);
 
-            vertices.push_back(r);
-            vertices.push_back(t * r);
+        vertices.push_back(w);
+        vertices.push_back(-w);
 
-            vertices.push_back(-t * r);
-            vertices.push_back(r);
+        vertices.push_back(w);
+        vertices.push_back(w);
+        
+        vertices.push_back(-w);
+        vertices.push_back(w);
+        
+        vertices.push_back(-w);
+        vertices.push_back(-w);
 
-            vertices.push_back(-r);
-            vertices.push_back(-t * r);
+        for (int i = 1; i < N_boundary; i++) {
 
-            vertices.push_back(t * r);
-            vertices.push_back(-r);
+            double t1 = w;
+            for (int _ = 0; _ < 15; _++) {
+                double t = (t0 + t1) / 2;
+
+                if (N_boundary * dst_k(t, w, -w, w) > i * l)
+                    t1 = t;
+                else
+                    t0 = t;
+            }
+
+            double t = (t0 + t1) / 2;
+
+            vertices.push_back(w);
+            vertices.push_back(t);
+
+            vertices.push_back(t);
+            vertices.push_back(w);
+
+            vertices.push_back(-w);
+            vertices.push_back(t);
+
+            vertices.push_back(t);
+            vertices.push_back(-w);
         }
 
         for (int i = 0; i < vertices.size(); i += 2) {
@@ -307,7 +346,7 @@ void cull_triangulation(triangulation_t& triangulation) {
 triangulation_t square_hyp(int N_vertices, int N_boundary, double radius, int N_iterations, int integral_resolution) {
     triangulation_t triangulation;
     triangulation.vertices = square(N_vertices, N_boundary, radius);
-    triangulation.N_vertices = N_vertices * N_vertices + 4 * N_boundary;
+    triangulation.N_vertices = triangulation.vertices.size() / 2;
     triangulation.N_boundary = 4 * N_boundary;
 
     delaunator::Delaunator d(triangulation.vertices);
@@ -323,6 +362,17 @@ triangulation_t square_hyp(int N_vertices, int N_boundary, double radius, int N_
     return triangulation;
 }
 
+double cos_a(double u0, double v0, double u1, double v1, double x, double y) {
+    double k = (1.0 - x * x - y * y);
+
+    double z0 = ((1 - y * y) * u0 + x * y * v0) / (k * k);
+    double w0 = ((1 - x * x) * v0 + x * y * u0) / (k * k);
+    double z1 = ((1 - y * y) * u1 + x * y * v1) / (k * k);
+    double w1 = ((1 - x * x) * v1 + x * y * u1) / (k * k);
+
+    return (z0 * u1 + w0 * v1) / glm::sqrt((z0 * u0 + w0 * v0) * (z1 * u1 + w1 * v1));
+}
+
 namespace {
     double dot_klein(double u0, double v0, double u1, double v1, double x, double y) {
         double k = (1.0 - x * x - y * y);
@@ -330,17 +380,6 @@ namespace {
         double w = ((1 - x * x) * v0 + x * y * u0) / (k * k);
 
         return z * u1 + w * v1;
-    }
-
-    double cos_a(double u0, double v0, double u1, double v1, double x, double y) {
-        double k = (1.0 - x * x - y * y);
-
-        double z0 = ((1 - y * y) * u0 + x * y * v0) / (k * k);
-        double w0 = ((1 - x * x) * v0 + x * y * u0) / (k * k);
-        double z1 = ((1 - y * y) * u1 + x * y * v1) / (k * k);
-        double w1 = ((1 - x * x) * v1 + x * y * u1) / (k * k);
-
-        return (z0 * u1 + w0 * v1) / glm::sqrt((z0 * u0 + w0 * v0) * (z1 * u1 + w1 * v1));
     }
 
     void triangle_quality(std::vector<double>& vertices, size_t i0, size_t i1, size_t i2, double* angle, double* size) {
@@ -489,4 +528,18 @@ triangulation_t disk_hyp(int N_vertices, double radius, int N_iterations, int in
     }
 
     return disk_hyp(N_vertices, N_boundary, radius, N_iterations, integral_resolution);
+}
+
+double dst_k(double x0, double y0, double x1, double y1) {
+    double t0 = 1 + glm::sqrt(1 - x0 * x0 - y0 * y0);
+    double t1 = 1 + glm::sqrt(1 - x1 * x1 - y1 * y1);
+
+    x0 /= t0; y0 /= t0;
+    x1 /= t1; y1 /= t1;
+
+    double u = x0 - x1;
+    double v = y0 - y1;
+
+    double d = 2 * (u * u + v * v) / ((1 - x0 * x0 - y0 * y0) * (1 - x1 * x1 - y1 * y1));
+    return glm::acosh(1 + d);
 }

@@ -74,7 +74,7 @@ void Window::Run() {
     int N_iterations = 0;
     int integral_resolution = 10;
 
-    float R = .86f;
+    float R = 3.f;
     bool hyperbolic = true;
 
     triangulation_t triangulation;
@@ -106,7 +106,7 @@ void Window::Run() {
             N_bdry = std::min<int>(N * N, N_bdry);
             R = std::max<double>(1e-1, R);
             if (hyperbolic) {
-                triangulation = disk(N, N_bdry, R, METRIC_POINCARE, N_iterations, integral_resolution);
+                triangulation = square(N, N_bdry, R, METRIC_POINCARE, N_iterations, integral_resolution);
                 analytics = analytics_hyp(triangulation);
             }
             else {

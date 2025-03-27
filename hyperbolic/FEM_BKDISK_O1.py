@@ -206,12 +206,15 @@ class Model:
             B += Jac_A * self._integrator.integrate(
                 lambda x, y: _u(x, y) * np.conj(_u(x, y)) * _dV(F1(x, y), F2(x, y)))
 
+        #print("B =", np.sqrt(np.real(B)))
+
         return np.sqrt(np.real(A) / np.real(B))
 
 
 
 if __name__ == "__main__":
-    vertices, polygons, trace = triangulate.generate(p=3, q=7, iterations=3, subdivisions=2, model="Klein")
+    vertices, polygons, trace = triangulate.load("./triangulations/uniform_disk_euc_1024.npz")
+    vertices *= np.tanh(3.0)
     model = Model(vertices, polygons, trace)
 
     f = lambda z: 1

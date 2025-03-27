@@ -28,6 +28,9 @@ struct analytics_t {
 	double size_max;
 };
 
+double cos_a(double u0, double v0, double u1, double v1, double x, double y);
+double dst_k(double x0, double y0, double x1, double y1);
+
 analytics_t analytics_euc(triangulation_t& triangulation);
 analytics_t analytics_hyp(triangulation_t& triangulation);
 
