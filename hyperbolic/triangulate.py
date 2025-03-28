@@ -378,12 +378,7 @@ def plot_triangulation(filename):
     plt.savefig("./figures/" + filename + ".png", dpi=300, bbox_inches=extent, transparent=True)
 
 if __name__ == "__main__":
-    plot_triangulation("uniform_disk_hyp_256")
-    plot_triangulation("uniform_disk_hyp_512")
-    plot_triangulation("uniform_disk_hyp_1024")
-    plot_triangulation("uniform_disk_hyp_2048")
-    plot_triangulation("uniform_disk_hyp_4096")
-    plot_triangulation("uniform_disk_hyp_8192")
+    plot_triangulation("uniform_rect_764")
     #plt.show()
     '''
 

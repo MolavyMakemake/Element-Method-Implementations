@@ -1,5 +1,18 @@
-﻿  generate_hyp.cpp
-D:\Users\47452\source\Element-Method-Implementations\meshgen\meshgen\generate_hyp.cpp(333,48): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
-D:\Users\47452\source\Element-Method-Implementations\meshgen\meshgen\generate_hyp.cpp(334,48): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
-D:\Users\47452\source\Element-Method-Implementations\meshgen\meshgen\generate_hyp.cpp(335,48): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+﻿  window.cpp
+D:\Users\47452\source\Element-Method-Implementations\meshgen\meshgen\Mesh.h(29,1): warning C4267: 'argument': conversion from 'size_t' to '_Ty', possible loss of data
+          with
+          [
+              _Ty=GLuint
+          ]
+D:\Users\47452\source\Element-Method-Implementations\meshgen\meshgen\Mesh.h(32,29): warning C4244: 'argument': conversion from 'double' to '_Ty', possible loss of data
+          with
+          [
+              _Ty=float
+          ]
+D:\Users\47452\source\Element-Method-Implementations\meshgen\meshgen\window.cpp(107,33): warning C4244: '=': conversion from 'const _Ty' to 'float', possible loss of data
+          with
+          [
+              _Ty=double
+          ]
+D:\Users\47452\source\Element-Method-Implementations\meshgen\meshgen\window.cpp(194,46): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
   meshgen.vcxproj -> D:\Users\47452\source\Element-Method-Implementations\meshgen\x64\Debug\meshgen.exe

@@ -4,7 +4,7 @@ import plot, triangulate
 import FEM_PDISK_O1, FEM_PDISK_O2, FEM_BKDISK_O1, FEM_BKDISK_O2
 import FEM_SIMPLEX_O1, FEM_STAUDTIAN_O1, FEM_HOMOGENEOUS_O1
 
-vertices_p, triangles, boundary = triangulate.load("./triangulations/uniform_rect_1100.npz")
+vertices_p, triangles, boundary = triangulate.load("./triangulations/uniform_rect_764.npz")
 vertices_k = triangulate._pdisk_to_bkdisk(vertices_p)
 
 models = (

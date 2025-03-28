@@ -201,7 +201,7 @@ void Window::Run() {
         if (ImGui::Button("Save")) {
             std::ofstream file;
             
-            std::string path = "../output/triangulation_sphere";
+            std::string path = "../output/triangulation_square";
             path += hyperbolic ? "_hyp_" : "_euc_";
             path += std::to_string(triangulation.N_vertices);
             path += "(" + std::to_string(triangulation.N_boundary) + ")";
