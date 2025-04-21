@@ -55,6 +55,18 @@ def dst(x0, x1):
 
     return np.arccosh(delta)
 
+def int_v(f, ds):
+    return np.sum(ds * (f[:-1] + f[1:])) / 2
+
+def normalize(v, x):
+    r = x * x
+    g11 = 1 - r[0, :]
+    g12 = x[0, :] * x[1, :]
+    g22 = 1 - r[1, :]
+
+    v2 = (g11 * v[0] + g12 * v[1]) * v[0] + (g12 * v[0] + g22 * v[1]) * v[1]
+    return (1 - r[0, :] - r[1, :]) / np.sqrt(v2) * v
+
 def compute_hyperbolic_area(v):
     N_v = np.size(v, axis=1)
 
@@ -130,8 +142,8 @@ def Int_WP(v, t):
         p1, dp1 = V1(X)
         p2, dp2 = V2(X)
 
-        I0 = np.sum(ds * (p1[:-1] + p1[1:])) / 2
-        I1 = np.sum(ds * (p2[:-1] + p2[1:])) / 2
+        I0 = int_v(p1, ds)
+        I1 = int_v(p2, ds)
 
         j = (i + 1) % N_v
 
@@ -165,6 +177,59 @@ def star(v, x):
         g11 * v[0, :] + g12 * v[1, :]
     ]) / np.sqrt(1 - r[0, :] - r[1, :])
 
+def Stabilizer(proj_P):
+    dv = np.roll(v, -1, axis=1) - v
+    h = dst(v, np.roll(v, -1, axis=1))
+
+    I00 = 0
+    I01 = 0
+    I11 = 0
+
+    N_v = np.size(v, axis=1)
+    I = np.zeros(shape=(N_v, N_v), dtype=float)
+    for i in range(N_v):
+        X = v[:, i, np.newaxis] + np.outer(dv[:, i], t)
+
+        ds = dst(X[:, :-1], X[:, 1:])
+
+        p1, dp1 = V1(X)
+        p2, dp2 = V2(X)
+
+        j = (i + 1) % N_v
+
+        I[i, i] += h[i] * h[i-1] * (h[i] + h[i-1])
+        I[i, j] += -h[i-1] * h[i] * h[j]
+        I[j, i] += -h[i-1] * h[i] * h[j]
+
+        dT = normalize(dv[i], X)
+        s0 = star(dp1, X)
+        s1 = star(dp2, X)
+
+        I0 = int_v(s0 @ dT, ds)
+        I1 = int_v(s1 @ dT, ds)
+
+        I00 += int_v((s0 @ dT) * (s0 @ dT), ds)
+        I01 += int_v((s0 @ dT) * (s1 @ dT), ds)
+        I11 += int_v((s1 @ dT) * (s1 @ dT), ds)
+
+        for k in range(N_v):
+            I[i, k] -= h[i-1] * (proj_P[0, k] * I0 + proj_P[1, k] * I1)
+            I[j, k] += h[j] * (proj_P[0, k] * I0 + proj_P[1, k] * I1)
+
+    for i in range(N_v):
+        I[i, i] += proj_P[0, i] * proj_P[0, i] * I00 \
+                + 2 * proj_P[0, i] * proj_P[1, i] * I01 \
+                + proj_P[1, i] * proj_P[1, i] * I11
+        for j in range(i+1, N_v):
+            _I_ij = proj_P[0, i] * proj_P[0, j] * I00 \
+                + proj_P[0, i] * proj_P[1, j] * I01 \
+                + proj_P[1, i] * proj_P[0, j] * I01 \
+                + proj_P[1, i] * proj_P[1, i] * I11
+
+            I[i, j] += _I_ij
+            I[j, i] += _I_ij
+
+    return I[:-1, :-1]
 
 v = np.array([
     [-.3, .8],
@@ -192,9 +257,10 @@ ax.set_xlabel("x")
 ax.set_ylabel("y")
 
 proj_P = np.linalg.inv(I_pp) @ I_wp
+print(proj_P)
 
 h = dst(v, np.roll(v, -1, axis=1)) / np.sqrt(2)
-a = np.linalg.lstsq(proj_P.T @ I_wp, I_vw)[0]
+a = np.linalg.inv(proj_P.T @ I_wp) @ I_vw
 
 print(I_vw)
 print(np.array([
