@@ -45,8 +45,8 @@ def angles(x0, x1, x2):
     a2 = np.arccos(-cos_a(u2, u0, y0))
     return [a0, a1, a2]
 
-N_v = 704
-N_bdry = 272
+N_v = 1203
+N_bdry = 284
 
 vertices = []
 triangles = []

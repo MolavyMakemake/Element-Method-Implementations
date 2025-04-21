@@ -24,34 +24,37 @@ def compute_h(vertices, polygons):
 
 R_k = np.sqrt(2) * np.tanh(.86)
 R = np.tanh(1.5)
-W = np.tanh(.86)
+W = np.tanh(3.0) / np.sqrt(2.0)
 W2 = W * W
 
-def v(z):
-    x2 = np.real(z) * np.real(z)
-    y2 = np.imag(z) * np.imag(z)
-    return (W2 - x2) * (W2 - y2)
-def f(z):
-    x2 = np.real(z) * np.real(z)
-    y2 = np.imag(z) * np.imag(z)
-    L = -2 * x2 * (1 - x2) * (W2 - y2) + 2 * x2 * y2 * (W2 - x2) \
-        -2 * y2 * (1 - y2) * (W2 - x2) + 2 * x2 * y2 * (W2 - y2) \
-        + (1 - x2 - y2) * (
-        -2 * (1 - x2) * (W2 - y2) + 4 * x2 * (W2 - y2) + 2 * y2 * (W2 - x2) - 4 * x2 * y2
-        -2 * (1 - y2) * (W2 - x2) + 4 * y2 * (W2 - x2) + 2 * x2 * (W2 - y2) - 4 * x2 * y2
-        )
-    return -L
+#def v(z):
+#    x2 = np.real(z) * np.real(z)
+#    y2 = np.imag(z) * np.imag(z)
+#    return (W2 - x2) * (W2 - y2)
+#def f(z):
+#    x2 = np.real(z) * np.real(z)
+#    y2 = np.imag(z) * np.imag(z)
+#    L = -2 * x2 * (1 - x2) * (W2 - y2) + 2 * x2 * y2 * (W2 - x2) \
+#        -2 * y2 * (1 - y2) * (W2 - x2) + 2 * x2 * y2 * (W2 - y2) \
+#        + (1 - x2 - y2) * (
+#        -2 * (1 - x2) * (W2 - y2) + 4 * x2 * (W2 - y2) + 2 * y2 * (W2 - x2) - 4 * x2 * y2
+#        -2 * (1 - y2) * (W2 - x2) + 4 * y2 * (W2 - x2) + 2 * x2 * (W2 - y2) - 4 * x2 * y2
+#        )
+#    return -L
 
 g0 = lambda t: -np.log(1 - t)
 c = g0(R * R)
-v_p = lambda z: c - g0(z * np.conj(z))
+_v_p = lambda z: c - g0(z * np.conj(z))
+v_p = lambda z: .5 * _v_p(z) * _v_p(z)
 
 #v_p = lambda z: R * R - z * np.conj(z)
 #f = lambda z: np.power(1 - z * np.conj(z), 2)
 
-#v = lambda z: v_p(z / (1 + np.sqrt(1 - z * np.conj(z))))
+v = lambda z: v_p(z / (1 + np.sqrt(1 - z * np.conj(z))))
 #f_p = lambda z: v(2 * z / (1 + z * np.conj(z)))
 
+f_p = lambda z: _v_p(z) - z * np.conj(z)
+f = lambda z: f_p(z / (1 + np.sqrt(1 - z * np.conj(z))))
 #f = lambda z: 1
 
 V = [v, v, v]
@@ -62,16 +65,17 @@ H_g = [[] for _ in range(len(F))]
 Y_e = [[] for _ in range(len(F))]
 Y_g = [[] for _ in range(len(F))]
 
-#for triangulation_f in ["./triangulations/uniform_disk_euc_256.npz",
-#                        "./triangulations/uniform_disk_euc_512.npz",
-#                        "./triangulations/uniform_disk_euc_1024.npz",
+for triangulation_f in ["./triangulations/uniform_disk_hyp_256.npz",
+                        "./triangulations/uniform_disk_hyp_512.npz"]:
+#                        "./triangulations/uniform_disk_hyp_1024.npz"]:
 #                        "./triangulations/uniform_disk_euc_2048.npz",
 #                        "./triangulations/uniform_disk_euc_4096.npz",
 #                        "./triangulations/uniform_disk_euc_8192.npz"]:
 
-for triangulation_f in ["./triangulations/uniform_rect_180.npz",
-                        "./triangulations/uniform_rect_560.npz",
-                        "./triangulations/uniform_rect_1100.npz"]:
+#for triangulation_f in ["./triangulations/uniform_rect_196.npz",
+#                        "./triangulations/uniform_rect_353.npz",
+#                        "./triangulations/uniform_rect_640.npz",
+#                        "./triangulations/uniform_rect_1247.npz"]:
 #for N in [256, 512, 1024, 2048, 4096, 8192]:
     #print(N)
 
@@ -89,9 +93,9 @@ for triangulation_f in ["./triangulations/uniform_rect_180.npz",
 
     res = 100
     models = [
-        FEM_BKDISK_O1.Model(vertices_k, polygons, boundary),
+FEM_BKDISK_O1.Model(vertices_k, polygons, boundary),
         FEM_SIMPLEX_O1.Model(vertices_k, polygons, boundary),
-        FEM_STAUDTIAN_O1.Model(vertices_k, polygons, boundary)
+        FEM_STAUDTIAN_O1.Model(vertices_k, polygons, boundary),
     ]
 
     h = compute_h(vertices, polygons)
@@ -107,7 +111,7 @@ print("Y_g =", Y_g)
 
 if True:
 
-    plt.loglog(H_dof[0], Y_g[0], "o--", color="black", label="VEM k=1")
+    plt.loglog(H_dof[0], Y_g[0], "o--", color="black", label="Klein k=1")
     plt.loglog(H_dof[1], Y_g[1], "o--", color="red", label="Simplex k=1")
     plt.loglog(H_dof[2], Y_g[2], "o--", color="red", label="Staudtian k=1")
     plt.ylabel("Relative error (hyperbolic metric)")
