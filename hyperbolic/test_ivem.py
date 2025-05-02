@@ -65,7 +65,7 @@ def normalize(v, x):
     g22 = 1 - r[1, :]
 
     v2 = (g11 * v[0] + g12 * v[1]) * v[0] + (g12 * v[0] + g22 * v[1]) * v[1]
-    return (1 - r[0, :] - r[1, :]) / np.sqrt(v2) * v
+    return (1 - r[0, :] - r[1, :]) / np.sqrt(v2) * v[:, np.newaxis]
 
 def compute_hyperbolic_area(v):
     N_v = np.size(v, axis=1)
@@ -177,7 +177,7 @@ def star(v, x):
         g11 * v[0, :] + g12 * v[1, :]
     ]) / np.sqrt(1 - r[0, :] - r[1, :])
 
-def Stabilizer(proj_P):
+def Stabilizer(v, t, proj_P):
     dv = np.roll(v, -1, axis=1) - v
     h = dst(v, np.roll(v, -1, axis=1))
 
@@ -201,35 +201,41 @@ def Stabilizer(proj_P):
         I[i, j] += -h[i-1] * h[i] * h[j]
         I[j, i] += -h[i-1] * h[i] * h[j]
 
-        dT = normalize(dv[i], X)
-        s0 = star(dp1, X)
-        s1 = star(dp2, X)
+        dT = normalize(dv[:, i], X)
 
-        I0 = int_v(s0 @ dT, ds)
-        I1 = int_v(s1 @ dT, ds)
+        s0 = np.sum(star(dp1, X) * dT, axis=0)
+        s1 = np.sum(star(dp2, X) * dT, axis=0)
 
-        I00 += int_v((s0 @ dT) * (s0 @ dT), ds)
-        I01 += int_v((s0 @ dT) * (s1 @ dT), ds)
-        I11 += int_v((s1 @ dT) * (s1 @ dT), ds)
+        I0 = int_v(s0, ds)
+        I1 = int_v(s1, ds)
 
-        for k in range(N_v):
-            I[i, k] -= h[i-1] * (proj_P[0, k] * I0 + proj_P[1, k] * I1)
-            I[j, k] += h[j] * (proj_P[0, k] * I0 + proj_P[1, k] * I1)
+        I00 += int_v(s0 * s0, ds)
+        I01 += int_v(s0 * s1, ds)
+        I11 += int_v(s1 * s1, ds)
 
-    for i in range(N_v):
+        for k in range(N_v - 1):
+            _I_ik = -h[i-1] * (proj_P[0, k] * I0 + proj_P[1, k] * I1)
+            _I_jk = h[j] * (proj_P[0, k] * I0 + proj_P[1, k] * I1)
+
+            I[i, k] += _I_ik
+            I[k, i] += _I_ik
+            I[j, k] += _I_jk
+            I[k, j] += _I_jk
+
+    for i in range(N_v - 1):
         I[i, i] += proj_P[0, i] * proj_P[0, i] * I00 \
                 + 2 * proj_P[0, i] * proj_P[1, i] * I01 \
                 + proj_P[1, i] * proj_P[1, i] * I11
-        for j in range(i+1, N_v):
+        for j in range(i+1, N_v - 1):
             _I_ij = proj_P[0, i] * proj_P[0, j] * I00 \
                 + proj_P[0, i] * proj_P[1, j] * I01 \
                 + proj_P[1, i] * proj_P[0, j] * I01 \
-                + proj_P[1, i] * proj_P[1, i] * I11
+                + proj_P[1, i] * proj_P[1, j] * I11
 
             I[i, j] += _I_ij
             I[j, i] += _I_ij
 
-    return I[:-1, :-1]
+    return I[:-1, :-1] * np.max(h)
 
 v = np.array([
     [-.3, .8],
@@ -257,21 +263,19 @@ ax.set_xlabel("x")
 ax.set_ylabel("y")
 
 proj_P = np.linalg.inv(I_pp) @ I_wp
-print(proj_P)
 
 h = dst(v, np.roll(v, -1, axis=1)) / np.sqrt(2)
-a = np.linalg.inv(proj_P.T @ I_wp) @ I_vw
+a = np.linalg.solve(proj_P.T @ I_wp + Stabilizer(v, t, proj_P), I_vw)
 
-print(I_vw)
-print(np.array([
-    [0, -h[0] * h[1]],
-    [h[0] * h[2], 0],
-    [-h[0] * h[2], h[0] * h[1]]
-]).T)
+print(proj_P)
+print(a)
 
-I = 1
-a = proj_P @ a[:, I]
+a = proj_P @ a
 
+print(np.dot(a[:, 0], I_pp @ a[:, 1]))
+
+I = 0
+a = a[:, I]
 
 for i in range(np.size(v, axis=1)):
     ax.scatter(v[0, i], v[1, i], s=0.6)

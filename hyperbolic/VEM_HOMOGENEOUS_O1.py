@@ -128,6 +128,18 @@ def star(v, x):
         g11 * v[0, :] + g12 * v[1, :]
     ]) / np.sqrt(1 - r[0, :] - r[1, :])
 
+def int_v(f, ds):
+    return np.sum(ds * (f[:-1] + f[1:])) / 2
+
+def normalize(v, x):
+    r = x * x
+    g11 = 1 - r[0, :]
+    g12 = x[0, :] * x[1, :]
+    g22 = 1 - r[1, :]
+
+    v2 = (g11 * v[0] + g12 * v[1]) * v[0] + (g12 * v[0] + g22 * v[1]) * v[1]
+    return (1 - r[0, :] - r[1, :]) / np.sqrt(v2) * v[:, np.newaxis]
+
 def Int_PP(v, t, dt):
     dv = np.roll(v, -1, axis=1) - v
 
@@ -205,6 +217,66 @@ def Int_VW(v):
     I[0, -1] = -h[0] * h[-1] / 2
     return I
 
+def Stabilizer(v, t, proj_P):
+    dv = np.roll(v, -1, axis=1) - v
+    h = dst(v, np.roll(v, -1, axis=1))
+
+    I00 = 0
+    I01 = 0
+    I11 = 0
+
+    N_v = np.size(v, axis=1)
+    I = np.zeros(shape=(N_v, N_v), dtype=float)
+    for i in range(N_v):
+        X = v[:, i, np.newaxis] + np.outer(dv[:, i], t)
+
+        ds = dst(X[:, :-1], X[:, 1:])
+
+        p1, dp1 = V1(X)
+        p2, dp2 = V2(X)
+
+        j = (i + 1) % N_v
+
+        I[i, i] += h[i] * h[i - 1] * (h[i] + h[i - 1])
+        I[i, j] += -h[i - 1] * h[i] * h[j]
+        I[j, i] += -h[i - 1] * h[i] * h[j]
+
+        dT = normalize(dv[:, i], X)
+
+        s0 = np.sum(star(dp1, X) * dT, axis=0)
+        s1 = np.sum(star(dp2, X) * dT, axis=0)
+
+        I0 = int_v(s0, ds)
+        I1 = int_v(s1, ds)
+
+        I00 += int_v(s0 * s0, ds)
+        I01 += int_v(s0 * s1, ds)
+        I11 += int_v(s1 * s1, ds)
+
+        for k in range(N_v - 1):
+            _I_ik = -h[i - 1] * (proj_P[0, k] * I0 + proj_P[1, k] * I1)
+            _I_jk = h[j] * (proj_P[0, k] * I0 + proj_P[1, k] * I1)
+
+            I[i, k] += _I_ik
+            I[k, i] += _I_ik
+            I[j, k] += _I_jk
+            I[k, j] += _I_jk
+
+    for i in range(N_v - 1):
+        I[i, i] += proj_P[0, i] * proj_P[0, i] * I00 \
+                   + 2 * proj_P[0, i] * proj_P[1, i] * I01 \
+                   + proj_P[1, i] * proj_P[1, i] * I11
+        for j in range(i + 1, N_v - 1):
+            _I_ij = proj_P[0, i] * proj_P[0, j] * I00 \
+                    + proj_P[0, i] * proj_P[1, j] * I01 \
+                    + proj_P[1, i] * proj_P[0, j] * I01 \
+                    + proj_P[1, i] * proj_P[1, j] * I11
+
+            I[i, j] += _I_ij
+            I[j, i] += _I_ij
+
+    return I[:-1, :-1] * np.max(h)
+
 def proj_RHS(v, t, dt):
     I_wp = Int_WP(v, t)
     I_pp = Int_PP(v, t, dt)
@@ -212,9 +284,8 @@ def proj_RHS(v, t, dt):
 
     proj_P = np.linalg.inv(I_pp) @ I_wp
 
-    return np.linalg.solve(proj_P.T @ I_wp, I_vw), I_vw
+    return proj_P @ np.linalg.solve(proj_P.T @ I_wp + Stabilizer(v, t, proj_P), I_vw), I_pp
     #return np.linalg.lstsq(proj_P.T @ I_wp, I_vw)[0], I_vw
-
 
 _BC_INTEGRATOR = Integrator(20)
 def barycenter(v):
@@ -379,21 +450,21 @@ class Model:
             t = np.linspace(0, 1, N+1)
             dt = 1.0 / N
 
-            proj_W, I_vw = proj_RHS(v, t, dt)
+            proj_P, I_pp = proj_RHS(v, t, dt)
 
             for i in range(N_v):
                 if not self._mask[I[i]]:
                     continue
 
                 e_i = self._elements[I[i]]
-                L[e_i, e_i] += np.dot(I_vw[:, i], proj_W[:, i])
+                L[e_i, e_i] += np.dot(proj_P[:, i], I_pp @ proj_P[:, i])
 
                 for j in range(i + 1, N_v):
                     if not self._mask[I[j]]:
                         continue
 
                     e_j = self._elements[I[j]]
-                    Lij = np.dot(I_vw[:, i], proj_W[:, j])
+                    Lij = np.dot(proj_P[:, i], I_pp @ proj_P[:, j])
                     L[e_i, e_j] += Lij
                     L[e_j, e_i] += Lij
 
@@ -493,7 +564,8 @@ class Model:
 
 
 if __name__ == "__main__":
-    vertices, polygons, trace = triangulate.generate(p=3, q=7, iterations=3, subdivisions=2, model="Klein")
+    vertices, polygons, trace = vem_triangulate.vem_mesh(512)
+    vertices = _Phi_DtK(vertices)
     model = Model(vertices, polygons, trace)
 
     f = lambda z: 1
